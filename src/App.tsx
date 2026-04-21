@@ -24,7 +24,7 @@ function App() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>tauri-starter</CardTitle>
+              <CardTitle>protoApp</CardTitle>
               <Badge variant="secondary">v0.1.0</Badge>
             </div>
             <CardDescription>

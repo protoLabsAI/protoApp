@@ -1,12 +1,12 @@
 [package]
-name = "tauri-starter"
+name = "protoapp"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "protoMaker"
+authors = ["protolabs"]
 edition = "2021"
 
 [lib]
-name = "tauri_starter_lib"
+name = "protoapp_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
