@@ -74,14 +74,14 @@ Why not the crates.io `tts-rs` crate we originally wanted: `tts-rs 2026.2.x` pin
 [rishiskhare/tts-rs#1](https://github.com/rishiskhare/tts-rs/issues/1).
 Kokoros handles the phonemizer + ONNX stack directly, so it sidesteps the issue.
 
-**Options we'll use when unblocked**
+**Future improvements worth considering**
 
-1. Switch to [`lucasjinreal/Kokoros`](https://github.com/lucasjinreal/Kokoros) as a git dep — mature implementation, not published to crates.io but that's a one-line `Cargo.toml` tweak.
-2. Hand-roll ORT + Kokoro ONNX integration inside voice-core. Most work; also gives us the most control over streaming.
-3. Wait for tts-rs upstream fix.
+1. Hand-roll ORT + Kokoro ONNX inside voice-core for tighter control over streaming chunk boundaries.
+2. Swap back to a published `tts-rs` once the upstream `ort` generic issue is resolved — the git dep is simpler than keeping our own wrapper.
+3. Add mp3 transcoding (see also the advisory `x-protoapp-note` header on the `/v1/audio/speech` response when `response_format=mp3`).
 
-Today the endpoint returns a valid silent WAV so the frontend contract
-holds while we wait.
+Without the `tts` feature the endpoint still returns a valid (silent, PCM16)
+WAV so any client relying on that contract keeps working.
 
 **Alternative we rejected for v1**: [Piper](https://github.com/rhasspy/piper)
 via `piper-rs`. Faster on low-end CPUs, many languages, but quality

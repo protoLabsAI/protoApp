@@ -110,13 +110,16 @@ async fn synthesize(input: &str, voice: &str) -> Vec<u8> {
     }
 }
 
-/// Build an in-memory WAV of the given duration (silent f32 at 24 kHz mono).
-/// Small enough to inline; avoids the `hound` dep on the default path.
+/// Build an in-memory WAV of the given duration (silent PCM16 at 24 kHz mono).
+/// Matches the byte layout of the real TTS output so clients that assume a
+/// specific WAV format (PCM16, not IEEE float) work unchanged whether the
+/// stub or Kokoros answers. Small enough to inline; avoids a hound dep on
+/// the default path.
 fn silence_wav_24khz(seconds: f32) -> Vec<u8> {
     let sample_rate: u32 = 24_000;
     let num_samples = (sample_rate as f32 * seconds) as u32;
-    let byte_rate = sample_rate * 4; // 1 ch * 4 bytes (f32)
-    let data_size = num_samples * 4;
+    let byte_rate = sample_rate * 2; // 1 ch * 2 bytes (i16)
+    let data_size = num_samples * 2;
     let chunk_size = 36 + data_size;
 
     let mut w = Vec::with_capacity(44 + data_size as usize);
@@ -125,16 +128,16 @@ fn silence_wav_24khz(seconds: f32) -> Vec<u8> {
     w.extend_from_slice(b"WAVE");
     w.extend_from_slice(b"fmt ");
     w.extend_from_slice(&16u32.to_le_bytes()); // subchunk1 size
-    w.extend_from_slice(&3u16.to_le_bytes()); // audio format = IEEE float
+    w.extend_from_slice(&1u16.to_le_bytes()); // audio format = PCM
     w.extend_from_slice(&1u16.to_le_bytes()); // channels
     w.extend_from_slice(&sample_rate.to_le_bytes());
     w.extend_from_slice(&byte_rate.to_le_bytes());
-    w.extend_from_slice(&4u16.to_le_bytes()); // block align
-    w.extend_from_slice(&32u16.to_le_bytes()); // bits per sample
+    w.extend_from_slice(&2u16.to_le_bytes()); // block align
+    w.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
     w.extend_from_slice(b"data");
     w.extend_from_slice(&data_size.to_le_bytes());
     for _ in 0..num_samples {
-        w.extend_from_slice(&0f32.to_le_bytes());
+        w.extend_from_slice(&0i16.to_le_bytes());
     }
     w
 }

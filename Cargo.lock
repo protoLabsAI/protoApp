@@ -3846,7 +3846,7 @@ dependencies = [
 [[package]]
 name = "kokoros"
 version = "0.1.0"
-source = "git+https://github.com/lucasjinreal/Kokoros.git#7089168f0ca2d8e1fcd8e523c9d75d915c6afdff"
+source = "git+https://github.com/lucasjinreal/Kokoros.git?rev=7089168f0ca2d8e1fcd8e523c9d75d915c6afdff#7089168f0ca2d8e1fcd8e523c9d75d915c6afdff"
 dependencies = [
  "espeak-rs",
  "hound",
@@ -6598,7 +6598,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6969,7 +6969,7 @@ checksum = "4db5a4a562bcc0017c34cd0efbabf447be783f00576a2a516947f884e6a7ed57"
 dependencies = [
  "ahash",
  "annotate-snippets",
- "base64 0.22.1",
+ "base64 0.21.7",
  "encoding_rs_io",
  "nohash-hasher",
  "num-traits",
@@ -9637,7 +9637,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

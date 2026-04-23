@@ -95,12 +95,13 @@ fn f32_samples_to_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
         let mut writer = hound::WavWriter::new(cursor, spec).expect("hound spec is valid");
         for &s in samples {
             let clamped = s.clamp(-1.0, 1.0);
-            let i = if clamped < 0.0 {
-                (clamped * i16::MAX as f32) as i16 // same magnitude as (-s) * 0x8000
-            } else {
-                (clamped * i16::MAX as f32) as i16
-            };
-            let _ = writer.write_sample(i);
+            let i = (clamped * i16::MAX as f32) as i16;
+            // Writing into an in-memory Cursor<Vec<u8>> only fails on
+            // OOM / integer overflow; use expect() with a helpful message
+            // so we don't silently drop samples on a real failure.
+            writer
+                .write_sample(i)
+                .expect("hound write_sample to in-memory Vec<u8>");
         }
         writer.finalize().expect("hound finalize");
     }

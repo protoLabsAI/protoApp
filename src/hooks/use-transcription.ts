@@ -59,10 +59,16 @@ export function useTranscription(model = "whisper-large-v3-turbo") {
           type: rec.mimeType || "audio/webm",
         });
         const arrayBuf = await recorded.arrayBuffer();
+        // AudioContext owns an OS audio thread — close it in `finally` so
+        // a decode/encode error doesn't leak the context.
         const ctx = new AudioContext();
-        const decoded = await ctx.decodeAudioData(arrayBuf);
-        const wav = encodeMono16kWav(decoded);
-        await ctx.close();
+        let wav: ArrayBuffer;
+        try {
+          const decoded = await ctx.decodeAudioData(arrayBuf);
+          wav = encodeMono16kWav(decoded);
+        } finally {
+          await ctx.close();
+        }
 
         const openai = await getOpenAI();
         const result = await openai.audio.transcriptions.create({

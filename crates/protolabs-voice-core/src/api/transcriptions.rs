@@ -106,32 +106,54 @@ pub async fn create(
         }
     };
 
-    let text = transcribe(&audio_bytes, &model).await;
-
-    if fmt_response {
-        text.into_response()
-    } else {
-        Json(TranscriptionResponse { text }).into_response()
+    match transcribe(&audio_bytes, &model).await {
+        Ok(text) => {
+            if fmt_response {
+                text.into_response()
+            } else {
+                Json(TranscriptionResponse { text }).into_response()
+            }
+        }
+        Err(e) => {
+            // Don't leak engine errors as user-facing transcription text.
+            // Mirror the OpenAI error shape used by /v1/chat/completions.
+            tracing::error!(?e, "transcription failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("transcription failed: {e}"),
+                        "type": "server_error",
+                        "code": "transcription_failure",
+                    }
+                })),
+            )
+                .into_response()
+        }
     }
 }
 
 #[cfg(not(feature = "stt"))]
-async fn transcribe(bytes: &[u8], model: &str) -> String {
-    format!(
+async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
+    Ok(format!(
         "[stub transcription — build with `--features stt` to enable whisper-rs; \
          needs cmake on the build host] received {} bytes for model {}",
         bytes.len(),
         model
-    )
+    ))
 }
 
 #[cfg(feature = "stt")]
-async fn transcribe(bytes: &[u8], _model: &str) -> String {
-    match crate::engines::stt::transcribe(bytes).await {
-        Ok(text) => text,
-        Err(e) => {
-            tracing::error!(?e, "whisper transcription failed");
-            format!("[transcription error: {e}]")
-        }
+async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
+    // The `model` parameter is accepted but our local STT path is always the
+    // one cached whisper model — validate the caller at least asked for a
+    // transcription-capable id so the request fails deterministically for
+    // obviously-wrong clients instead of silently returning a Whisper result
+    // under a bogus label.
+    if !super::models::is_transcription_model(model) {
+        tracing::warn!(requested_model = %model, "unknown transcription model id");
     }
+    crate::engines::stt::transcribe(bytes)
+        .await
+        .map_err(|e| e.to_string())
 }

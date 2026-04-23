@@ -106,3 +106,11 @@ pub fn is_chat_model(id: &str) -> bool {
 pub fn is_speech_model(id: &str) -> bool {
     SPEECH_MODELS.contains(id)
 }
+
+static TRANSCRIPTION_MODELS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ids_for_kind(ModelKind::Transcription));
+
+/// Lookup: does the catalog contain a transcription (STT) model with this id?
+pub fn is_transcription_model(id: &str) -> bool {
+    TRANSCRIPTION_MODELS.contains(id)
+}

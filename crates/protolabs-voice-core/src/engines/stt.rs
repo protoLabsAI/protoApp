@@ -64,13 +64,23 @@ pub async fn ensure_model() -> Result<PathBuf> {
         "downloading whisper model (first run only)"
     );
 
-    // Stream download into a temp file, then rename on completion so a
-    // partial download can't masquerade as a complete one.
-    let tmp = path.with_extension("bin.partial");
+    // Stream download into a per-process temp file, then rename-on-completion
+    // so a partial download can't masquerade as complete. The unique suffix
+    // prevents two concurrent callers from stomping each other's temp file.
+    let tmp = path.with_extension(format!(
+        "bin.partial.{}.{}",
+        std::process::id(),
+        uuid::Uuid::new_v4().simple()
+    ));
     download_streaming(DEFAULT_MODEL_URL, &tmp).await?;
-    tokio::fs::rename(&tmp, &path)
-        .await
-        .context("rename whisper model into place")?;
+    // If a racing process finished before us, keep their copy and discard ours.
+    if path.exists() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    } else {
+        tokio::fs::rename(&tmp, &path)
+            .await
+            .context("rename whisper model into place")?;
+    }
     Ok(path)
 }
 
@@ -198,7 +208,13 @@ fn read_wav_to_f32_mono(bytes: &[u8]) -> Result<(Vec<f32>, u32, u16)> {
             .collect::<std::result::Result<_, _>>()
             .context("read f32 PCM")?,
         hound::SampleFormat::Int => {
-            let max = (1i64 << (spec.bits_per_sample - 1)) as f32;
+            // Normalize by iN::MAX (e.g. 32767 for 16-bit) rather than 2^(N-1):
+            // the integer PCM range is symmetric around zero in practice (i16
+            // samples are clamped to [-32768, 32767], but typical encoders
+            // never emit -32768). Using the positive max keeps full-scale
+            // positive and negative samples both land at ±1.0 after
+            // conversion, which is what whisper expects.
+            let max = ((1i64 << (spec.bits_per_sample - 1)) - 1) as f32;
             reader
                 .samples::<i32>()
                 .map(|s| s.map(|v| v as f32 / max))
@@ -229,7 +245,9 @@ fn naive_resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
         return input.to_vec();
     }
     let ratio = from as f64 / to as f64;
-    let out_len = ((input.len() as f64) / ratio).round() as usize;
+    // Guarantee at least one output sample when input is non-empty so the
+    // indexing below stays valid for very short clips.
+    let out_len = (((input.len() as f64) / ratio).round() as usize).max(1);
     let mut out = Vec::with_capacity(out_len);
     for i in 0..out_len {
         let src = (i as f64) * ratio;
