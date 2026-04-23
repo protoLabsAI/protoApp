@@ -1,9 +1,10 @@
 [package]
 name = "protoapp"
-version = "0.1.0"
-description = "protoMaker"
-authors = ["protolabs"]
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "protoApp — Tauri desktop app"
 
 [lib]
 name = "protoapp_lib"
@@ -13,17 +14,30 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Tauri glue
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 specta = { version = "=2.0.0-rc.24" }
 specta-typescript = "0.0.11"
 tauri-specta = { version = "=2.0.0-rc.24", features = ["derive", "typescript"] }
 
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = "s"
-panic = "abort"
-strip = true
+# Async runtime for the in-process HTTP server we own
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# The engine substrate — OpenAI-compatible router + inference engines
+protolabs-voice-core = { path = "../crates/protolabs-voice-core" }
+
+[features]
+default = []
+# Re-export protolabs-voice-core feature knobs so `cargo tauri build --features metal`
+# etc. at the protoapp level propagates correctly.
+llm = ["protolabs-voice-core/llm"]
+stt = ["protolabs-voice-core/stt"]
+tts = ["protolabs-voice-core/tts"]
+engines = ["protolabs-voice-core/engines"]
+metal = ["protolabs-voice-core/metal"]
+cuda = ["protolabs-voice-core/cuda"]

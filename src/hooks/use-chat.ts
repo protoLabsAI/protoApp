@@ -1,0 +1,117 @@
+import { useCallback, useRef, useState } from "react";
+import { getOpenAI } from "@/services/openai";
+
+export interface ChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+export interface UseChatOptions {
+  model?: string;
+  systemPrompt?: string;
+}
+
+export function useChat({
+  model = "gemma-4-e2b",
+  systemPrompt = "You are a helpful assistant running entirely locally.",
+}: UseChatOptions = {}) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  // Synchronous guard — React state updates are async, so two rapid send()
+  // calls could both pass `!isStreaming` before either render lands. This
+  // ref is set before any await and checked before we commit to a run.
+  const isStreamingRef = useRef(false);
+  // Monotonically increasing request id. Each send() captures the id it
+  // was assigned at entry; the finally block only clears streaming state
+  // if that id is still the current one. This stops an old request's
+  // cleanup from stomping a newer request that's already started (e.g.
+  // user hits stop + immediately sends again before the old finally runs).
+  const reqIdRef = useRef(0);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    // Deliberately do NOT reset reqIdRef here — we want the aborted
+    // request's finally block to see a stale id and skip its cleanup.
+    isStreamingRef.current = false;
+    setIsStreaming(false);
+  }, []);
+
+  const send = useCallback(
+    async (input: string) => {
+      if (!input.trim() || isStreamingRef.current) return;
+      isStreamingRef.current = true;
+
+      reqIdRef.current += 1;
+      const thisReq = reqIdRef.current;
+
+      setError(null);
+      setIsStreaming(true);
+
+      const userMsg: ChatMessage = { role: "user", content: input };
+      const history = [...messages, userMsg];
+      setMessages([...history, { role: "assistant", content: "" }]);
+
+      const abort = new AbortController();
+      abortRef.current = abort;
+
+      try {
+        const openai = await getOpenAI();
+        const stream = await openai.chat.completions.create(
+          {
+            model,
+            messages: [{ role: "system", content: systemPrompt }, ...history],
+            stream: true,
+          },
+          { signal: abort.signal },
+        );
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (!delta) continue;
+          setMessages((prev) => {
+            const copy = [...prev];
+            const last = copy[copy.length - 1];
+            if (last?.role === "assistant") {
+              copy[copy.length - 1] = { ...last, content: last.content + delta };
+            }
+            return copy;
+          });
+        }
+      } catch (e) {
+        if ((e as { name?: string })?.name !== "AbortError") {
+          const err = e instanceof Error ? e : new Error(String(e));
+          setError(err);
+          // Re-throw so callers that want to branch on success (e.g. the
+          // chat UI preserving the composer input on failure) can catch it.
+          // `setError` has already updated state, so a consumer that
+          // ignores the throw still gets the error via `error`.
+          throw err;
+        }
+      } finally {
+        // Only clear state if we're still the current request. If a newer
+        // send() has already taken over (or stop() was followed by a fresh
+        // send()), reqIdRef.current will be greater than ours — leave its
+        // state alone.
+        if (reqIdRef.current === thisReq) {
+          setIsStreaming(false);
+          isStreamingRef.current = false;
+          abortRef.current = null;
+        }
+      }
+    },
+    [messages, model, systemPrompt],
+  );
+
+  const clear = useCallback(() => {
+    // Abort any in-flight request before wiping state so tokens from a
+    // stale stream can't mutate the freshly-cleared message list.
+    stop();
+    setMessages([]);
+    setError(null);
+  }, [stop]);
+
+  return { messages, send, stop, clear, isStreaming, error };
+}
