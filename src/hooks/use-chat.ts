@@ -82,7 +82,13 @@ export function useChat({
         }
       } catch (e) {
         if ((e as { name?: string })?.name !== "AbortError") {
-          setError(e instanceof Error ? e : new Error(String(e)));
+          const err = e instanceof Error ? e : new Error(String(e));
+          setError(err);
+          // Re-throw so callers that want to branch on success (e.g. the
+          // chat UI preserving the composer input on failure) can catch it.
+          // `setError` has already updated state, so a consumer that
+          // ignores the throw still gets the error via `error`.
+          throw err;
         }
       } finally {
         // Only clear state if we're still the current request. If a newer

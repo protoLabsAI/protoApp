@@ -18,9 +18,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::http::{HeaderValue, Method, header};
+use axum::http::{HeaderValue, Method};
 use axum::routing::{get, post};
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::{AllowHeaders, AllowOrigin, CorsLayer};
 
 use state::AppState;
 
@@ -35,6 +35,12 @@ pub fn router(state: Arc<AppState>) -> Router {
     // Tauri webview, or for `curl`). Server apps that want to open this
     // up should layer their own CorsLayer on top via [`router`] rather
     // than editing this default.
+    // Safety model: allow-any on headers and methods is fine here *because*
+    // allow_origin is narrowed to loopback — no attacker-controlled page can
+    // trigger a preflight that reaches this router. Narrowing `allow_headers`
+    // further would break the OpenAI JS SDK, which sends `x-stainless-*`
+    // telemetry headers on every request; a CORS preflight that rejects
+    // them takes down chat.
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
             origin
@@ -44,11 +50,7 @@ pub fn router(state: Arc<AppState>) -> Router {
                 .unwrap_or(false)
         }))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers([
-            header::CONTENT_TYPE,
-            header::AUTHORIZATION,
-            header::ACCEPT,
-        ]);
+        .allow_headers(AllowHeaders::any());
 
     Router::new()
         .route("/v1/models", get(models::list))

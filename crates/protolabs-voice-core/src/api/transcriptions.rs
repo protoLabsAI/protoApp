@@ -67,7 +67,15 @@ pub async fn create(
                 }
             }
             "response_format" => {
-                response_format = field.text().await.unwrap_or_else(|_| "json".into());
+                // Mirror the `model` handling: only overwrite the default
+                // when the parsed text is non-empty, so an empty or failed
+                // read leaves `"json"` in place instead of producing an
+                // empty string that immediately fails validation below.
+                if let Ok(v) = field.text().await {
+                    if !v.is_empty() {
+                        response_format = v;
+                    }
+                }
             }
             _ => {
                 let _ = field.bytes().await; // drain unknown fields

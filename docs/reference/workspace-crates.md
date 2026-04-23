@@ -72,7 +72,7 @@ format.
 
 - `protolabs-voice-core` is the reusable substrate — protoApp, a future orbis-tauri, a headless CLI can all embed it.
 - `orbis-sidecar` has zero engine logic; it's pure IPC plumbing. Keeping it separate avoids cross-contamination if we ever want voice without ORBIS or ORBIS without voice.
-- `protoapp` is the thinnest possible Tauri wrapper that demonstrates both crates in one place.
+- `protoApp` is the thinnest possible Tauri wrapper that demonstrates both crates in one place.
 
 If this grows to a fourth crate, it'll be for a shared audio-IO layer
 (cpal + VAD + echo cancellation) that belongs outside voice-core.

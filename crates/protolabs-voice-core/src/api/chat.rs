@@ -86,6 +86,23 @@ pub async fn completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Response {
+    // Reject empty histories before any dispatch so both stub and real-engine
+    // paths get the same deterministic 400.
+    if req.messages.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": {
+                    "message": "`messages` must contain at least one entry",
+                    "type": "invalid_request_error",
+                    "param": "messages",
+                    "code": "missing_required_param",
+                }
+            })),
+        )
+            .into_response();
+    }
+
     // Reject requests for models we don't serve. We still advertise a model id
     // even when the real engine isn't compiled in, so the check is against the
     // catalog — not against whether the engine is actually loaded.

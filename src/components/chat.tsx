@@ -20,8 +20,14 @@ export function Chat() {
     e.preventDefault();
     const text = input.trim();
     if (!text) return;
-    setInput("");
-    await send(text);
+    try {
+      await send(text);
+      // Only clear the composer after a successful turn so the user can
+      // retry without re-typing if the backend errored.
+      setInput("");
+    } catch {
+      // use-chat already stored the error in `error`; preserve input.
+    }
   };
 
   return (

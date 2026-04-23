@@ -9,8 +9,8 @@ WebSocket client. Here's how to wire it up.
 Your sidecar binary (a PyApp-bundled ORBIS, or `python -m orbis`) must:
 
 1. Bind a WebSocket server on `127.0.0.1:<ephemeral port>`.
-2. Print **exactly one line** to stdout: `ORBIS_READY ws://127.0.0.1:<port>/<path>` (any path works).
-3. Stay in the foreground until it receives SIGKILL or a graceful shutdown message.
+2. Print **exactly one line** to stdout: `ORBIS_READY ws://127.0.0.1:<port>/<path>` (any path works; the port is required — no scheme defaults).
+3. Stay in the foreground until it receives SIGKILL from the host. Today `Sidecar::shutdown(grace)` does a hard kill; message-based graceful shutdown is a future extension (see the caveats section below).
 4. Speak the [protocol](../reference/orbis-sidecar-protocol.md) — minimally, accept `{"type":"user","text":"..."}` and reply with zero or more `{"type":"token","text":"..."}` followed by a `{"type":"turn_end"}`.
 
 That's the full contract. Nothing else is mandatory.

@@ -156,5 +156,18 @@ for the structured shape, `text/plain` otherwise.
 
 ## CORS
 
-Everything is allowed (`Any`/`Any`/`Any`). Safe because the server
-binds to `127.0.0.1` only; no remote origin can reach it.
+The server binds to `127.0.0.1`, which keeps the socket off the network
+but **not** off other pages in the user's browser — any site a user
+visits can issue `fetch("http://127.0.0.1:<port>/...")`. The router
+therefore enforces a loopback-only CORS allowlist:
+
+- `allow_origin`: loopback IPs (`127.0.0.0/8`, `::1`), `localhost`, and the Tauri webview schemes (`tauri://localhost` on macOS/Linux, `http[s]://tauri.localhost` on Windows). All other origins are rejected at preflight.
+- `allow_methods`: `GET`, `POST`, `OPTIONS`.
+- `allow_headers`: any header. Loosely set because the allow-origin
+  narrowing already prevents an attacker from exercising it — and
+  because the OpenAI JS SDK sends a handful of `x-stainless-*` telemetry
+  headers we don't want to enumerate by hand.
+
+If you expose this surface beyond loopback (via a reverse proxy,
+ngrok, etc.) add your own authentication layer — the CORS allowlist
+does nothing for non-browser callers.
