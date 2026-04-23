@@ -87,3 +87,10 @@ pub fn is_chat_model(id: &str) -> bool {
         .into_iter()
         .any(|m| m.id == id && matches!(m.kind, ModelKind::Chat))
 }
+
+/// Lookup: does the catalog contain a speech-capable (TTS) model with this id?
+pub fn is_speech_model(id: &str) -> bool {
+    default_models()
+        .into_iter()
+        .any(|m| m.id == id && matches!(m.kind, ModelKind::Speech))
+}

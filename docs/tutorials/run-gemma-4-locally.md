@@ -61,8 +61,11 @@ shared with every other HF-ecosystem tool on the box.
 ## 4. Notice what changes
 
 - Replies are real now, not echoes.
-- Function-calling works — Gemma 4's native tool-use JSON round-trips through the OpenAI `tools` field (try prompting "call the weather tool").
 - The first request is slow (model load), every subsequent one is fast.
+
+> Function calling: the model supports it, but the `/v1/chat/completions`
+> streaming handler in `engines/llm.rs` currently forwards only
+> `delta.content`, not `tool_calls` deltas. Tracked as a follow-up.
 
 ## Troubleshooting
 

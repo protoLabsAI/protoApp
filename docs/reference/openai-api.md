@@ -126,11 +126,30 @@ ok
 
 ## Errors
 
-4xx: the endpoint rejects the request (missing `file`, empty `input`,
-bad JSON). Body is a plain text reason.
+4xx response bodies are **mixed**:
 
-5xx: real engine failure. Stub fallback emits a best-effort response
-rather than a 500 — check logs for the underlying error.
+- `POST /v1/chat/completions` returns OpenAI-style JSON:
+  ```json
+  {
+    "error": {
+      "message": "model `foo` not found",
+      "type": "invalid_request_error",
+      "param": "model",
+      "code": "model_not_found"
+    }
+  }
+  ```
+- `POST /v1/audio/transcriptions` and `POST /v1/audio/speech` return
+  plain text reasons (e.g. `` `input` must not be empty ``) for simple
+  validation failures, and OpenAI-style JSON for model lookups.
+
+5xx: real engine failure. `/v1/chat/completions` returns the same
+OpenAI JSON shape with `"code": "backend_failure"`. The stub fallback
+emits a best-effort 200 rather than a 5xx — check the logs for the
+underlying error if you see suspicious stub-like replies.
+
+Either way, the `Content-Type` header distinguishes: `application/json`
+for the structured shape, `text/plain` otherwise.
 
 ## CORS
 

@@ -61,9 +61,17 @@ pub async fn load_default() -> Result<Model> {
 }
 
 /// Kick off a streaming chat completion. Deltas land in `tx` as plain strings;
-/// the channel closes when the model emits its final chunk. Any error is
-/// logged and propagated by dropping the sender.
-pub async fn stream(model: &Model, history: Vec<ChatMessage>, tx: mpsc::Sender<String>) {
+/// the channel closes when the model emits its final chunk.
+///
+/// Returns `Ok(())` on a clean finish or a client-disconnect, `Err(msg)` if
+/// the backend signals a failure mid-stream (ModelError / InternalError /
+/// ValidationError / the initial stream_chat_request itself failing). The
+/// caller is expected to forward the error into the HTTP response.
+pub async fn stream(
+    model: &Model,
+    history: Vec<ChatMessage>,
+    tx: mpsc::Sender<String>,
+) -> std::result::Result<(), String> {
     let mut request = RequestBuilder::new();
     for msg in &history {
         let role = match msg.role.as_str() {
@@ -81,13 +89,14 @@ pub async fn stream(model: &Model, history: Vec<ChatMessage>, tx: mpsc::Sender<S
         request = request.add_message(role, msg.content.clone());
     }
 
-    let mut stream = match model.stream_chat_request(request).await {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!(?e, "stream_chat_request failed");
-            return;
-        }
-    };
+    let mut stream = model
+        .stream_chat_request(request)
+        .await
+        .map_err(|e| {
+            let msg = format!("stream_chat_request failed: {e}");
+            tracing::error!(%msg);
+            msg
+        })?;
 
     while let Some(chunk) = stream.next().await {
         match chunk {
@@ -101,20 +110,26 @@ pub async fn stream(model: &Model, history: Vec<ChatMessage>, tx: mpsc::Sender<S
                 }) = choices.first()
                 {
                     if tx.send(content.clone()).await.is_err() {
-                        return; // client disconnected
+                        // Client went away — not an error on our side.
+                        return Ok(());
                     }
                 }
             }
-            Response::Done(_) | Response::CompletionDone(_) => break,
+            Response::Done(_) | Response::CompletionDone(_) => return Ok(()),
             Response::ModelError(msg, _) => {
                 tracing::error!(%msg, "model error during generation");
-                break;
+                return Err(format!("model error: {msg}"));
             }
-            Response::InternalError(e) | Response::ValidationError(e) => {
-                tracing::error!(?e, "model returned error");
-                break;
+            Response::InternalError(e) => {
+                tracing::error!(?e, "internal error during generation");
+                return Err(format!("internal error: {e}"));
+            }
+            Response::ValidationError(e) => {
+                tracing::error!(?e, "validation error during generation");
+                return Err(format!("validation error: {e}"));
             }
             _ => {} // CompletionChunk / CompletionModelError / etc.
         }
     }
+    Ok(())
 }

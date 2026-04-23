@@ -23,17 +23,29 @@ export function useChat({
   // calls could both pass `!isStreaming` before either render lands. This
   // ref is set before any await and checked before we commit to a run.
   const isStreamingRef = useRef(false);
+  // Monotonically increasing request id. Each send() captures the id it
+  // was assigned at entry; the finally block only clears streaming state
+  // if that id is still the current one. This stops an old request's
+  // cleanup from stomping a newer request that's already started (e.g.
+  // user hits stop + immediately sends again before the old finally runs).
+  const reqIdRef = useRef(0);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    // Deliberately do NOT reset reqIdRef here — we want the aborted
+    // request's finally block to see a stale id and skip its cleanup.
     isStreamingRef.current = false;
+    setIsStreaming(false);
   }, []);
 
   const send = useCallback(
     async (input: string) => {
       if (!input.trim() || isStreamingRef.current) return;
       isStreamingRef.current = true;
+
+      reqIdRef.current += 1;
+      const thisReq = reqIdRef.current;
 
       setError(null);
       setIsStreaming(true);
@@ -73,9 +85,15 @@ export function useChat({
           setError(e instanceof Error ? e : new Error(String(e)));
         }
       } finally {
-        setIsStreaming(false);
-        isStreamingRef.current = false;
-        abortRef.current = null;
+        // Only clear state if we're still the current request. If a newer
+        // send() has already taken over (or stop() was followed by a fresh
+        // send()), reqIdRef.current will be greater than ours — leave its
+        // state alone.
+        if (reqIdRef.current === thisReq) {
+          setIsStreaming(false);
+          isStreamingRef.current = false;
+          abortRef.current = null;
+        }
       }
     },
     [messages, model, systemPrompt],

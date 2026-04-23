@@ -12,7 +12,7 @@ function App() {
         <div className="w-full max-w-2xl flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">protoApp</h1>
-            <Badge variant="secondary">v0.1.0</Badge>
+            <Badge variant="secondary">v{__APP_VERSION__}</Badge>
           </div>
           <Button variant="outline" size="sm" onClick={toggleTheme}>
             {theme === "light" ? "Dark" : "Light"}

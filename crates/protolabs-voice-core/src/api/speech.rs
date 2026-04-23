@@ -36,14 +36,45 @@ pub async fn create(
     State(_state): State<Arc<AppState>>,
     Json(req): Json<SpeechRequest>,
 ) -> Response {
+    // --- Validate everything before we do any work -----------------------
+
     if req.input.trim().is_empty() {
         return (StatusCode::BAD_REQUEST, "`input` must not be empty").into_response();
     }
 
+    // Model: if the caller pins one, require it to be a speech model we serve.
+    // Passing `None` or omitting the field falls through to our default.
+    if let Some(m) = req.model.as_deref() {
+        if !super::models::is_speech_model(m) {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("speech model `{m}` not found"),
+                        "type": "invalid_request_error",
+                        "param": "model",
+                        "code": "model_not_found",
+                    }
+                })),
+            )
+                .into_response();
+        }
+    }
+
+    let fmt = req.response_format.as_deref().unwrap_or("wav");
+    if !matches!(fmt, "wav" | "mp3") {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("unsupported response_format `{fmt}`; use `wav` or `mp3`"),
+        )
+            .into_response();
+    }
+
+    // --- Work ------------------------------------------------------------
+
     let voice = req.voice.as_deref().unwrap_or("af_heart");
     let audio = synthesize(&req.input, voice).await;
 
-    let fmt = req.response_format.as_deref().unwrap_or("wav");
     let mut headers = HeaderMap::new();
     // Always WAV on the wire today; mp3 transcoding is a TODO. We surface
     // that to clients that asked for mp3 via a custom header so they can

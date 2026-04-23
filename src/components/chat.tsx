@@ -77,7 +77,6 @@ export function Chat() {
           </label>
           <Input
             id="chat-input"
-            aria-label="Message"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={isStreaming ? "Streaming…" : "Type a message"}

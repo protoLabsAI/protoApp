@@ -8,20 +8,31 @@ let cachedBaseUrl: string | null = null;
  * Lazy-instantiate an OpenAI client pointed at the in-process Rust server.
  * The base URL is resolved from the Tauri `get_api_base_url` command the first
  * time the client is used, then cached for the session.
+ *
+ * If initialization fails (e.g. the Tauri command rejects because the server
+ * hasn't bound yet), the cached promise is cleared so the next call retries.
  */
 export function getOpenAI(): Promise<OpenAI> {
   if (!clientPromise) {
-    clientPromise = (async () => {
-      const base = await invoke<string>("get_api_base_url");
-      cachedBaseUrl = base;
-      return new OpenAI({
-        baseURL: `${base}/v1`,
-        apiKey: "local", // our server ignores the key; OpenAI SDK requires one
-        dangerouslyAllowBrowser: true,
-      });
-    })();
+    const pending = initClient();
+    clientPromise = pending;
+    // Evict a rejected promise so callers can retry on the next call
+    // instead of seeing the same stale rejection forever.
+    pending.catch(() => {
+      if (clientPromise === pending) clientPromise = null;
+    });
   }
   return clientPromise;
+}
+
+async function initClient(): Promise<OpenAI> {
+  const base = await invoke<string>("get_api_base_url");
+  cachedBaseUrl = base;
+  return new OpenAI({
+    baseURL: `${base}/v1`,
+    apiKey: "local", // our server ignores the key; OpenAI SDK requires one
+    dangerouslyAllowBrowser: true,
+  });
 }
 
 /**

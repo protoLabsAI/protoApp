@@ -13,7 +13,7 @@ run via [mistralrs](https://github.com/EricLBuehler/mistral.rs) 0.8.
 **Why this model**
 
 - Released 2026-04-02; 3 weeks old at time of writing.
-- Native function calling — the agent-shaped API we care about actually works.
+- Native function calling support at the model level — the agent-shaped API we care about is what the weights were trained for. **Note**: our streaming handler in `crates/protolabs-voice-core/src/engines/llm.rs` currently forwards only `delta.content`; `tool_calls` deltas are not yet surfaced on `/v1/chat/completions`. Follow-up tracked in the README roadmap.
 - Vision + audio input (we don't use audio input in v1 — whisper-rs is faster and more predictable).
 - MatFormer architecture: "E2B" means ~2 B **effective** params from a deeper base, so the runtime footprint is ~2 GB at Q4_K_M — installable on a user's laptop.
 

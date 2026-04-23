@@ -111,39 +111,64 @@ pub async fn completions(
     }
 }
 
-async fn json_response(
-    state: Arc<AppState>,
-    req: ChatRequest,
-) -> (StatusCode, Json<ChatCompletion>) {
-    // Accumulate the streamed tokens into a single response body. This gives
-    // us one code path for real + stub backends without duplicating prompt
-    // assembly.
+/// Terminal outcome of `drive_backend`. The mpsc sender streams tokens; this
+/// channel carries the final success/failure signal so we can distinguish a
+/// clean finish from a silent drop (e.g. the backend panicked or aborted).
+type BackendOutcome = std::result::Result<(), BackendError>;
+
+#[derive(Debug, Clone)]
+struct BackendError {
+    message: String,
+}
+
+async fn json_response(state: Arc<AppState>, req: ChatRequest) -> Response {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(32);
+    let (done_tx, done_rx) = tokio::sync::oneshot::channel::<BackendOutcome>();
     let req_clone = req.clone_messages();
     tokio::spawn(async move {
-        drive_backend(state, req_clone, tx).await;
+        drive_backend(state, req_clone, tx, done_tx).await;
     });
 
     let mut content = String::new();
     while let Some(piece) = rx.recv().await {
         content.push_str(&piece);
     }
+    let outcome = done_rx.await.unwrap_or_else(|_| {
+        Err(BackendError {
+            message: "backend dropped without signalling".into(),
+        })
+    });
 
-    let body = ChatCompletion {
-        id: format!("chatcmpl-{}", Uuid::new_v4().simple()),
-        object: "chat.completion",
-        created: now_secs(),
-        model: req.model,
-        choices: vec![ChoiceFull {
-            index: 0,
-            message: ChatMessage {
-                role: "assistant".into(),
-                content,
-            },
-            finish_reason: "stop",
-        }],
-    };
-    (StatusCode::OK, Json(body))
+    match outcome {
+        Ok(()) => {
+            let body = ChatCompletion {
+                id: format!("chatcmpl-{}", Uuid::new_v4().simple()),
+                object: "chat.completion",
+                created: now_secs(),
+                model: req.model,
+                choices: vec![ChoiceFull {
+                    index: 0,
+                    message: ChatMessage {
+                        role: "assistant".into(),
+                        content,
+                    },
+                    finish_reason: "stop",
+                }],
+            };
+            (StatusCode::OK, Json(body)).into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": {
+                    "message": e.message,
+                    "type": "server_error",
+                    "code": "backend_failure",
+                }
+            })),
+        )
+            .into_response(),
+    }
 }
 
 async fn stream_response(
@@ -155,9 +180,10 @@ async fn stream_response(
     let model = req.model.clone();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(32);
+    let (done_tx, mut done_rx) = tokio::sync::oneshot::channel::<BackendOutcome>();
     let req_clone = req.clone_messages();
     tokio::spawn(async move {
-        drive_backend(state, req_clone, tx).await;
+        drive_backend(state, req_clone, tx, done_tx).await;
     });
 
     let s = stream! {
@@ -190,6 +216,25 @@ async fn stream_response(
             yield Ok(Event::default().data(serde_json::to_string(&chunk).unwrap()));
         }
 
+        let outcome = (&mut done_rx).await.unwrap_or_else(|_| {
+            Err(BackendError { message: "backend dropped without signalling".into() })
+        });
+        let finish_reason = if outcome.is_ok() { "stop" } else { "error" };
+
+        if let Err(e) = &outcome {
+            // Emit a non-standard error frame before the terminator so clients
+            // that check for it can surface it; the OpenAI SDK simply ignores
+            // unknown keys.
+            let err_frame = serde_json::json!({
+                "id": id.clone(),
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model.clone(),
+                "error": { "message": e.message.clone(), "type": "server_error" },
+            });
+            yield Ok(Event::default().data(err_frame.to_string()));
+        }
+
         // Closing chunk — finish_reason.
         let last = ChatChunk {
             id: id.clone(),
@@ -199,7 +244,7 @@ async fn stream_response(
             choices: vec![ChoiceDelta {
                 index: 0,
                 delta: Delta::default(),
-                finish_reason: Some("stop"),
+                finish_reason: Some(finish_reason),
             }],
         };
         yield Ok(Event::default().data(serde_json::to_string(&last).unwrap()));
@@ -213,16 +258,24 @@ async fn stream_response(
 
 /// Dispatch to the real engine when it's compiled in; otherwise emit a stub
 /// stream so the frontend and transport can still be exercised end-to-end.
+///
+/// Always sends a terminal [`BackendOutcome`] on `done`, even if we took the
+/// stub fallback path (in which case it's `Ok(())`). That's the signal the
+/// response handlers use to distinguish "clean finish" from "silent drop".
 async fn drive_backend(
     _state: Arc<AppState>,
     req: ChatRequest,
     tx: tokio::sync::mpsc::Sender<String>,
+    done: tokio::sync::oneshot::Sender<BackendOutcome>,
 ) {
     #[cfg(feature = "llm")]
     {
         match _state.llm_or_load().await {
             Ok(model) => {
-                crate::engines::llm::stream(model, req.messages, tx).await;
+                let outcome = crate::engines::llm::stream(model, req.messages, tx)
+                    .await
+                    .map_err(|message| BackendError { message });
+                let _ = done.send(outcome);
                 return;
             }
             Err(e) => {
@@ -233,6 +286,7 @@ async fn drive_backend(
     }
 
     emit_stub(&req, &tx).await;
+    let _ = done.send(Ok(()));
 }
 
 async fn emit_stub(req: &ChatRequest, tx: &tokio::sync::mpsc::Sender<String>) {
