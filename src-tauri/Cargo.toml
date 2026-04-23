@@ -22,27 +22,43 @@ specta-typescript = "0.0.11"
 tauri-specta = { version = "=2.0.0-rc.24", features = ["derive", "typescript"] }
 
 # Local OpenAI-compatible HTTP server
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 bytes = "1"
 futures = "0.3"
 async-stream = "0.3"
 tokio-stream = "0.1"
+anyhow = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Real inference engines — feature-gated so the default build stays fast.
-# Build with `cargo build --features engines` once ready (10+ min cold).
+# Real inference engines — each is feature-gated so the default build
+# stays fast and you only pay for what you opt into. `stt` needs cmake on
+# the build host (`brew install cmake` on macOS).
+#
+# TTS is currently stub-only; `tts-rs` 2026.2.x has an upstream ort/rc
+# version mismatch that breaks its compile. Swap in kokoros (git) or a
+# direct `ort` integration once upstream is unblocked.
 mistralrs = { version = "0.8", optional = true }
+whisper-rs = { version = "0.16", optional = true, default-features = false }
 
 [features]
 default = []
-engines = ["dep:mistralrs"]
+# Individual engines — compose them as needed.
+llm = ["dep:mistralrs"]
+stt = ["dep:whisper-rs"]
+# Placeholder: gates the speech endpoint stub; swap in a crate when ready.
+tts = []
+# Umbrella: all available engines.
+engines = ["llm", "stt", "tts"]
+# GPU backends — harmless no-ops unless the corresponding engine is also on.
+metal = ["mistralrs?/metal", "mistralrs?/accelerate", "whisper-rs?/metal"]
+cuda = ["mistralrs?/cuda", "whisper-rs?/cuda"]
 
 [dev-dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "multipart"] }
 
 [profile.release]
 codegen-units = 1

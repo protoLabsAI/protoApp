@@ -5,6 +5,7 @@ use tauri_specta::{Builder, collect_commands};
 
 pub mod api;
 mod commands;
+mod engines;
 
 /// Injected into Tauri managed state so commands (and the frontend) can
 /// discover the ephemeral port the local OpenAI-compatible server is bound to.

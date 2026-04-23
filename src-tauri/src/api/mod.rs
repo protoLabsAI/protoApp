@@ -9,7 +9,9 @@
 
 pub mod chat;
 pub mod models;
+pub mod speech;
 pub mod state;
+pub mod transcriptions;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -29,6 +31,8 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/v1/models", get(models::list))
         .route("/v1/chat/completions", post(chat::completions))
+        .route("/v1/audio/transcriptions", post(transcriptions::create))
+        .route("/v1/audio/speech", post(speech::create))
         .route("/healthz", get(healthz))
         .with_state(state)
         .layer(cors)

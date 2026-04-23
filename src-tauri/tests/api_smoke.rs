@@ -66,6 +66,77 @@ async fn chat_completions_streams_sse_and_terminates() {
 }
 
 #[tokio::test]
+async fn transcriptions_accepts_multipart_and_returns_json() {
+    let (addr, fut) = api::bind().await.expect("bind");
+    tokio::spawn(fut);
+
+    let fake_audio = vec![0u8; 1024];
+    let form = reqwest::multipart::Form::new()
+        .part(
+            "file",
+            reqwest::multipart::Part::bytes(fake_audio)
+                .file_name("clip.wav")
+                .mime_str("audio/wav")
+                .unwrap(),
+        )
+        .text("model", "whisper-large-v3-turbo");
+
+    let body: serde_json::Value = reqwest::Client::new()
+        .post(format!("http://{addr}/v1/audio/transcriptions"))
+        .multipart(form)
+        .send()
+        .await
+        .expect("post")
+        .json()
+        .await
+        .expect("json");
+
+    let text = body["text"].as_str().expect("text field");
+    assert!(!text.is_empty());
+    assert!(
+        text.contains("1024 bytes") || text.contains("stub") || text.contains("pending"),
+        "stub should mention byte count, got: {text}"
+    );
+}
+
+#[tokio::test]
+async fn speech_returns_audio_bytes() {
+    let (addr, fut) = api::bind().await.expect("bind");
+    tokio::spawn(fut);
+
+    let resp = reqwest::Client::new()
+        .post(format!("http://{addr}/v1/audio/speech"))
+        .json(&json!({
+            "model": "kokoro-82m",
+            "input": "Hello from the local server.",
+            "voice": "af_heart"
+        }))
+        .send()
+        .await
+        .expect("post");
+
+    assert!(resp.status().is_success());
+    let bytes = resp.bytes().await.expect("bytes");
+    assert!(bytes.len() > 44, "must include at least a WAV header");
+    assert_eq!(&bytes[0..4], b"RIFF", "expected a WAV file");
+    assert_eq!(&bytes[8..12], b"WAVE");
+}
+
+#[tokio::test]
+async fn speech_rejects_empty_input() {
+    let (addr, fut) = api::bind().await.expect("bind");
+    tokio::spawn(fut);
+
+    let resp = reqwest::Client::new()
+        .post(format!("http://{addr}/v1/audio/speech"))
+        .json(&json!({ "input": "" }))
+        .send()
+        .await
+        .expect("post");
+    assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
 async fn chat_completions_json_mode_returns_body() {
     let (addr, fut) = api::bind().await.expect("bind");
     tokio::spawn(fut);

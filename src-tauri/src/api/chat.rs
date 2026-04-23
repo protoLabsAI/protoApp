@@ -83,18 +83,34 @@ pub struct Delta {
 }
 
 pub async fn completions(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Response {
     if req.stream {
-        stream_response(req).into_response()
+        stream_response(state, req).await.into_response()
     } else {
-        json_response(req).into_response()
+        json_response(state, req).await.into_response()
     }
 }
 
-fn json_response(req: ChatRequest) -> (StatusCode, Json<ChatCompletion>) {
-    let reply = stub_reply(&req);
+async fn json_response(
+    state: Arc<AppState>,
+    req: ChatRequest,
+) -> (StatusCode, Json<ChatCompletion>) {
+    // Accumulate the streamed tokens into a single response body. This gives
+    // us one code path for real + stub backends without duplicating prompt
+    // assembly.
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(32);
+    let req_clone = req.clone_messages();
+    tokio::spawn(async move {
+        drive_backend(state, req_clone, tx).await;
+    });
+
+    let mut content = String::new();
+    while let Some(piece) = rx.recv().await {
+        content.push_str(&piece);
+    }
+
     let body = ChatCompletion {
         id: format!("chatcmpl-{}", Uuid::new_v4().simple()),
         object: "chat.completion",
@@ -104,7 +120,7 @@ fn json_response(req: ChatRequest) -> (StatusCode, Json<ChatCompletion>) {
             index: 0,
             message: ChatMessage {
                 role: "assistant".into(),
-                content: reply,
+                content,
             },
             finish_reason: "stop",
         }],
@@ -112,11 +128,19 @@ fn json_response(req: ChatRequest) -> (StatusCode, Json<ChatCompletion>) {
     (StatusCode::OK, Json(body))
 }
 
-fn stream_response(req: ChatRequest) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+async fn stream_response(
+    state: Arc<AppState>,
+    req: ChatRequest,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let id = format!("chatcmpl-{}", Uuid::new_v4().simple());
     let created = now_secs();
     let model = req.model.clone();
-    let reply = stub_reply(&req);
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(32);
+    let req_clone = req.clone_messages();
+    tokio::spawn(async move {
+        drive_backend(state, req_clone, tx).await;
+    });
 
     let s = stream! {
         // Opening chunk — role only.
@@ -133,8 +157,7 @@ fn stream_response(req: ChatRequest) -> Sse<impl Stream<Item = Result<Event, Inf
         };
         yield Ok(Event::default().data(serde_json::to_string(&first).unwrap()));
 
-        // Token chunks — one word per chunk, 40ms cadence, so the UI animates.
-        for word in reply.split_inclusive(' ') {
+        while let Some(piece) = rx.recv().await {
             let chunk = ChatChunk {
                 id: id.clone(),
                 object: "chat.completion.chunk",
@@ -142,12 +165,11 @@ fn stream_response(req: ChatRequest) -> Sse<impl Stream<Item = Result<Event, Inf
                 model: model.clone(),
                 choices: vec![ChoiceDelta {
                     index: 0,
-                    delta: Delta { role: None, content: Some(word.to_string()) },
+                    delta: Delta { role: None, content: Some(piece) },
                     finish_reason: None,
                 }],
             };
             yield Ok(Event::default().data(serde_json::to_string(&chunk).unwrap()));
-            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
         }
 
         // Closing chunk — finish_reason.
@@ -171,7 +193,31 @@ fn stream_response(req: ChatRequest) -> Sse<impl Stream<Item = Result<Event, Inf
     Sse::new(s).keep_alive(KeepAlive::default())
 }
 
-fn stub_reply(req: &ChatRequest) -> String {
+/// Dispatch to the real engine when it's compiled in; otherwise emit a stub
+/// stream so the frontend and transport can still be exercised end-to-end.
+async fn drive_backend(
+    _state: Arc<AppState>,
+    req: ChatRequest,
+    tx: tokio::sync::mpsc::Sender<String>,
+) {
+    #[cfg(feature = "llm")]
+    {
+        match _state.llm_or_load().await {
+            Ok(model) => {
+                crate::engines::llm::stream(model, req.messages, tx).await;
+                return;
+            }
+            Err(e) => {
+                tracing::error!(?e, "failed to load LLM engine; falling back to stub");
+                // Fall through to stub so the client still sees something.
+            }
+        }
+    }
+
+    emit_stub(&req, &tx).await;
+}
+
+async fn emit_stub(req: &ChatRequest, tx: &tokio::sync::mpsc::Sender<String>) {
     let last_user = req
         .messages
         .iter()
@@ -180,10 +226,29 @@ fn stub_reply(req: &ChatRequest) -> String {
         .map(|m| m.content.as_str())
         .unwrap_or("(no user message)");
 
-    format!(
-        "[stub reply — enable the `engines` feature for real Gemma 4 inference] \
+    let reply = format!(
+        "[stub reply — build with `--features metal` (macOS) or `--features cuda` for real Gemma 4 inference] \
          You said: {last_user}"
-    )
+    );
+
+    for word in reply.split_inclusive(' ') {
+        if tx.send(word.to_string()).await.is_err() {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+    }
+}
+
+impl ChatRequest {
+    fn clone_messages(&self) -> ChatRequest {
+        ChatRequest {
+            model: self.model.clone(),
+            messages: self.messages.clone(),
+            stream: self.stream,
+            temperature: self.temperature,
+            max_tokens: self.max_tokens,
+        }
+    }
 }
 
 fn now_secs() -> u64 {
