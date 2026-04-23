@@ -6,7 +6,8 @@
 //! so a request for `"mp3"` still receives WAV bytes plus an advisory
 //! `x-protoapp-note` header.
 //!
-//! Without the `tts` feature we return a minimal valid WAV containing
+//! With the `tts` feature we call into Kokoros (24 kHz mono f32 → PCM16 WAV).
+//! Without it we return a minimal valid WAV containing
 //! silence so the client can still play back something and we can verify the
 //! transport end-to-end.
 
@@ -99,9 +100,14 @@ async fn synthesize(_input: &str, _voice: &str) -> Vec<u8> {
 }
 
 #[cfg(feature = "tts")]
-async fn synthesize(_input: &str, _voice: &str) -> Vec<u8> {
-    // TODO(step-1f): wire tts-rs (Kokoro) here once model-download helper lands.
-    silence_wav_24khz(1.0)
+async fn synthesize(input: &str, voice: &str) -> Vec<u8> {
+    match crate::engines::tts::synthesize_wav(input, voice).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::error!(?e, "kokoros synthesis failed; falling back to silence");
+            silence_wav_24khz(1.0)
+        }
+    }
 }
 
 /// Build an in-memory WAV of the given duration (silent f32 at 24 kHz mono).

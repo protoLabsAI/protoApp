@@ -9,8 +9,8 @@ through the workspace.
 | Feature | Pulls in | Status |
 |---|---|---|
 | `llm` | `mistralrs = "0.8"` | Real — Gemma 4 E2B GGUF via `GgufModelBuilder`. |
-| `stt` | `whisper-rs = "0.16"` | Endpoint scaffolded; real model wiring pending. Requires `cmake` on the build host. |
-| `tts` | *none currently* | Placeholder — stub emits silent WAV. `tts-rs` has an upstream `ort` compile break; we'll wire in kokoros or direct ort when fixed. |
+| `stt` | `whisper-rs = "0.16"` + `hound` | Real — Whisper via whisper.cpp. Requires `cmake` on the build host (`brew install cmake` on macOS). Auto-downloads `ggml-base.en-q5_1` (~60 MB) into `~/.cache/protoapp/whisper/` on first use. |
+| `tts` | `kokoros` (git dep) + ORT runtime | Real — Kokoro-82M via ONNX. Requires `cmake` plus the [workspace `.cargo/config.toml`](../../.cargo/config.toml) env var `CMAKE_POLICY_VERSION_MINIMUM=3.5` (already set). Auto-downloads `kokoro-v1.0.onnx` + voices bin (~340 MB) into `~/.cache/protoapp/kokoro/` on first use. |
 | `engines` | `llm` + `stt` + `tts` | Umbrella for "everything". |
 
 ## GPU backends

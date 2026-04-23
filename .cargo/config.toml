@@ -1,0 +1,9 @@
+# Workspace-wide environment.
+#
+# Some native deps we pull in transitively (audiopus_sys → opus C sources,
+# and a handful of other upstream C libraries) still declare
+# `cmake_minimum_required(VERSION <3.5)`, which CMake 4 refuses to build.
+# Pin the policy floor to 3.5 so those subprojects configure cleanly
+# without having to patch the crates.
+[env]
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

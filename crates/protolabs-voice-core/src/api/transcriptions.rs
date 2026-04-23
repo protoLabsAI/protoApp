@@ -4,8 +4,13 @@
 //! Returns `{"text": "..."}` on `json` (default) or the raw text when the
 //! client asks for `response_format=text`.
 //!
-//! Without the `stt` feature, we return a stub acknowledging the file size
+//! With the `stt` feature we hand the file bytes to whisper-rs (see
+//! `engines::stt`). Without it we return a stub acknowledging the file size
 //! so the frontend plumbing can be exercised end-to-end.
+//!
+//! The frontend's `useTranscription` hook sends 16 kHz mono PCM16 WAV so the
+//! server never touches an audio codec; clients that upload a different WAV
+//! sample-rate get naively resampled on the server.
 
 use std::sync::Arc;
 
@@ -122,10 +127,11 @@ async fn transcribe(bytes: &[u8], model: &str) -> String {
 
 #[cfg(feature = "stt")]
 async fn transcribe(bytes: &[u8], _model: &str) -> String {
-    // TODO(step-1e): wire whisper-rs here once model-download helper lands.
-    // Placeholder keeps the endpoint contract stable in STT-enabled builds.
-    format!(
-        "[whisper-rs wiring pending — received {} bytes]",
-        bytes.len()
-    )
+    match crate::engines::stt::transcribe(bytes).await {
+        Ok(text) => text,
+        Err(e) => {
+            tracing::error!(?e, "whisper transcription failed");
+            format!("[transcription error: {e}]")
+        }
+    }
 }

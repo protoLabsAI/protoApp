@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { getOpenAI } from "@/services/openai";
+import { encodeMono16kWav } from "@/lib/wav";
 
 type Phase = "idle" | "recording" | "transcribing" | "done" | "error";
 
@@ -45,15 +46,27 @@ export function useTranscription(model = "whisper-large-v3-turbo") {
       }
       streamRef.current = null;
 
-      const blob = new Blob(chunksRef.current, {
-        type: rec.mimeType || "audio/webm",
-      });
       setPhase("transcribing");
 
       try {
+        // Browsers hand MediaRecorder output back in whatever codec they
+        // chose (Chrome → webm/opus, Safari → mp4/aac). The server is
+        // codec-agnostic only because we convert to 16 kHz mono PCM16
+        // WAV here — AudioContext.decodeAudioData handles every format
+        // the browser can record, and encodeMono16kWav packages the
+        // samples into a small WAV whisper.cpp can read directly.
+        const recorded = new Blob(chunksRef.current, {
+          type: rec.mimeType || "audio/webm",
+        });
+        const arrayBuf = await recorded.arrayBuffer();
+        const ctx = new AudioContext();
+        const decoded = await ctx.decodeAudioData(arrayBuf);
+        const wav = encodeMono16kWav(decoded);
+        await ctx.close();
+
         const openai = await getOpenAI();
         const result = await openai.audio.transcriptions.create({
-          file: new File([blob], "clip.webm", { type: blob.type }),
+          file: new File([wav], "clip.wav", { type: "audio/wav" }),
           model,
         });
         setText(result.text ?? "");

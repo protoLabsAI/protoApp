@@ -50,8 +50,12 @@ against GGML weights.
 - `Xenova/moonshine-base` — optimized for streaming / low latency. Compelling for real-time voice, but English-only and the quality gap vs Whisper turbo is real enough that we punt the trade-off until we're doing streaming pipelines in earnest.
 - `sherpa-onnx` — single ONNX runtime for STT + TTS + VAD. Would let us drop one dep; costs us Metal on Whisper.
 
-**Current status**: endpoint scaffolded with a stub. Real wiring needs
-`brew install cmake` on the build host, plus a model-download helper.
+**Shipped** behind `--features stt`:
+
+- Frontend records via `MediaRecorder`, then `AudioContext.decodeAudioData` + our `encodeMono16kWav` helper (`src/lib/wav.ts`) emit 16 kHz mono PCM16 WAV. The server never touches an audio codec.
+- Server: `hound` parses the WAV, `whisper-rs` 0.16 runs it against the cached `ggml-base.en-q5_1.bin` model (auto-downloaded into `~/.cache/protoapp/whisper/`).
+- Build prerequisite: `brew install cmake` (whisper.cpp vendors C++ that needs a cmake configure step).
+- Override `PROTOAPP_WHISPER_MODEL_PATH` to point at a different GGML model.
 
 ## TTS: Kokoro-82M (pending)
 
@@ -60,23 +64,15 @@ against GGML weights.
 neural TTS, Apache-2.0, 50+ voices across 9 languages, ~10 s of audio
 synthesized in ~1 s on WebGPU and similar on CPU via ONNX Runtime.
 
-**Current blocker**: the crates.io crate
-[`tts-rs`](https://crates.io/crates/tts-rs) fails to compile against
-the `ort` release cargo resolves for it. We tested `2026.2.1`,
-`2026.2.2`, and `2026.2.3`; all three fail the same way. The compile
-error from rustc, abbreviated:
+**Shipped** behind `--features tts`:
 
-```
-error[E0277]: `?` couldn't convert the error to `KokoroError`:
-  the trait `From<ort::Error<SessionBuilder>>` is not implemented
-  for `KokoroError`
-  --> tts-rs/src/engines/kokoro/model.rs:292:44
-```
+- Implementation: [`lucasjinreal/Kokoros`](https://github.com/lucasjinreal/Kokoros) via a pinned git dep. Exports `TTSKoko::tts_raw_audio(txt, lan, voice, speed, ...)` returning `Vec<f32>` at 24 kHz, which we wrap in a PCM16 WAV with `hound` before handing to the client.
+- Engine is lazily initialized once per process; Kokoros handles the model + voice-pack downloads on first use into `~/.cache/protoapp/kokoro/`. Override paths with `PROTOAPP_KOKORO_{MODEL,VOICES}_PATH`.
+- Build prerequisites: `brew install cmake` (pulled in transitively by `audiopus_sys`), plus the workspace-level `CMAKE_POLICY_VERSION_MINIMUM=3.5` in `.cargo/config.toml` so CMake 4 doesn't refuse the vendored C projects that still target CMake ≤ 3.4.
 
-ort moved `SessionBuilder` out of (or changed its position in) the
-`Error<T>` generic in a post-rc.10 release; tts-rs's `?` calls against
-the old signature break. Track the upstream issue at
+Why not the crates.io `tts-rs` crate we originally wanted: `tts-rs 2026.2.x` pins an older `ort` rc, but cargo resolves a newer one in workspace context and that tripped a generic-parameter mismatch on `ort::Error<SessionBuilder>`. Tracked upstream at
 [rishiskhare/tts-rs#1](https://github.com/rishiskhare/tts-rs/issues/1).
+Kokoros handles the phonemizer + ONNX stack directly, so it sidesteps the issue.
 
 **Options we'll use when unblocked**
 
