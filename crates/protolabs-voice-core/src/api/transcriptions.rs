@@ -132,15 +132,31 @@ pub async fn create(
                 Json(TranscriptionResponse { text }).into_response()
             }
         }
-        Err(e) => {
-            // Don't leak engine errors as user-facing transcription text.
-            // Mirror the OpenAI error shape used by /v1/chat/completions.
-            tracing::error!(?e, "transcription failed");
+        Err(Failure::BadAudio(msg)) => {
+            // Client-side problem — log at debug because this isn't a bug
+            // in our side, and return 400 with an invalid_request_error so
+            // the OpenAI SDK raises a sensible exception class.
+            tracing::debug!(%msg, "rejecting malformed audio");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("could not decode audio: {msg}"),
+                        "type": "invalid_request_error",
+                        "param": "file",
+                        "code": "bad_audio",
+                    }
+                })),
+            )
+                .into_response()
+        }
+        Err(Failure::Engine(msg)) => {
+            tracing::error!(%msg, "transcription engine failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
                     "error": {
-                        "message": format!("transcription failed: {e}"),
+                        "message": format!("transcription failed: {msg}"),
                         "type": "server_error",
                         "code": "transcription_failure",
                     }
@@ -151,8 +167,18 @@ pub async fn create(
     }
 }
 
+/// Always-compiled shape of what the inner transcribe helper returns, so
+/// the handler's `match` above doesn't need its own cfg arms. Under `stt`
+/// we map `engines::stt::TranscriptionFailure` into this; under the stub
+/// only `Ok` is ever produced.
+#[derive(Debug)]
+enum Failure {
+    BadAudio(String),
+    Engine(String),
+}
+
 #[cfg(not(feature = "stt"))]
-async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
+async fn transcribe(bytes: &[u8], model: &str) -> Result<String, Failure> {
     Ok(format!(
         "[stub transcription — build with `--features stt` to enable whisper-rs; \
          needs cmake on the build host] received {} bytes for model {}",
@@ -162,11 +188,13 @@ async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
 }
 
 #[cfg(feature = "stt")]
-async fn transcribe(bytes: &[u8], _model: &str) -> Result<String, String> {
+async fn transcribe(bytes: &[u8], _model: &str) -> Result<String, Failure> {
+    use crate::engines::stt::TranscriptionFailure;
     // Model-id validation happens in the outer handler, not here — by this
     // point we've already confirmed the caller asked for an id we serve,
     // which today maps to the single cached whisper model.
-    crate::engines::stt::transcribe(bytes)
-        .await
-        .map_err(|e| e.to_string())
+    crate::engines::stt::transcribe(bytes).await.map_err(|e| match e {
+        TranscriptionFailure::BadAudio(s) => Failure::BadAudio(s),
+        TranscriptionFailure::Engine(s) => Failure::Engine(s),
+    })
 }

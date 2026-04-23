@@ -144,13 +144,37 @@ async fn context() -> Result<&'static WhisperContext> {
     .await
 }
 
+/// Error returned from [`transcribe`] — split by *who* caused the failure
+/// so the HTTP handler can map to 400 vs 500 cleanly instead of flattening
+/// both into an opaque 500.
+#[derive(Debug)]
+pub enum TranscriptionFailure {
+    /// Client sent audio we can't decode (bad WAV header, unsupported sample
+    /// format, zero-length buffer, etc.).
+    BadAudio(String),
+    /// Our side: whisper crashed, model load failed, spawn_blocking panicked.
+    Engine(String),
+}
+
+impl std::fmt::Display for TranscriptionFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BadAudio(s) => write!(f, "bad audio: {s}"),
+            Self::Engine(s) => write!(f, "engine error: {s}"),
+        }
+    }
+}
+
+impl std::error::Error for TranscriptionFailure {}
+
 /// Transcribe the WAV-encoded audio bytes that came in as the `file` field
 /// of a `POST /v1/audio/transcriptions` request. The frontend's
 /// `useTranscription` hook guarantees 16 kHz mono PCM16 WAV; older clients
 /// that send a different WAV format are converted on the fly.
-pub async fn transcribe(wav_bytes: &[u8]) -> Result<String> {
+pub async fn transcribe(wav_bytes: &[u8]) -> std::result::Result<String, TranscriptionFailure> {
     let (samples, source_rate, source_channels) = read_wav_to_f32_mono(wav_bytes)
-        .context("decode incoming WAV")?;
+        .context("decode incoming WAV")
+        .map_err(|e| TranscriptionFailure::BadAudio(format!("{e:#}")))?;
 
     let samples = if source_rate == 16_000 {
         samples
@@ -167,7 +191,9 @@ pub async fn transcribe(wav_bytes: &[u8]) -> Result<String> {
         "running whisper"
     );
 
-    let ctx = context().await?;
+    let ctx = context()
+        .await
+        .map_err(|e| TranscriptionFailure::Engine(format!("{e:#}")))?;
     // Whisper calls into CPU/GPU-bound C++ that holds its own locks; keep it
     // off the tokio pool so async tasks don't starve.
     let text = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
@@ -190,7 +216,8 @@ pub async fn transcribe(wav_bytes: &[u8]) -> Result<String> {
         Ok(out.trim().to_string())
     })
     .await
-    .context("join whisper worker")??;
+    .map_err(|e| TranscriptionFailure::Engine(format!("join whisper worker: {e}")))?
+    .map_err(|e| TranscriptionFailure::Engine(format!("{e:#}")))?;
 
     Ok(text)
 }
