@@ -4,10 +4,10 @@
 //! quick sanity check, then POSTs a streaming chat completion and verifies
 //! we receive SSE frames ending in the literal `[DONE]` sentinel.
 //!
-//! Run with: `cargo test -p protoapp --test api_smoke`
+//! Run with: `cargo test -p protolabs-voice-core --test api_smoke`
 
 use futures::StreamExt;
-use protoapp_lib::api;
+use protolabs_voice_core::api;
 use serde_json::json;
 
 #[tokio::test]

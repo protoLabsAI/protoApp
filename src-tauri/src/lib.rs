@@ -1,11 +1,11 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
+use protolabs_voice_core::{self as voice_core, AppState};
 use tauri::Manager;
 use tauri_specta::{Builder, collect_commands};
 
-pub mod api;
 mod commands;
-mod engines;
 
 /// Injected into Tauri managed state so commands (and the frontend) can
 /// discover the ephemeral port the local OpenAI-compatible server is bound to.
@@ -48,7 +48,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(specta_builder.invoke_handler())
         .setup(move |app| {
-            let (addr, server_fut) = handle.block_on(async { api::bind().await })?;
+            let state = Arc::new(AppState::new());
+            let (addr, server_fut) = handle.block_on(async {
+                voice_core::bind_with_state(state.clone()).await
+            })?;
             tracing::info!(%addr, "OpenAI-compatible server listening");
             handle.spawn(async move {
                 if let Err(e) = server_fut.await {

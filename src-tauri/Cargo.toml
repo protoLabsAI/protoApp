@@ -1,9 +1,10 @@
 [package]
 name = "protoapp"
-version = "0.1.0"
-description = "protoMaker"
-authors = ["protolabs"]
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "protoApp — Tauri desktop app"
 
 [lib]
 name = "protoapp_lib"
@@ -13,56 +14,30 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+# Tauri glue
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde.workspace = true
+serde_json.workspace = true
 specta = { version = "=2.0.0-rc.24" }
 specta-typescript = "0.0.11"
 tauri-specta = { version = "=2.0.0-rc.24", features = ["derive", "typescript"] }
 
-# Local OpenAI-compatible HTTP server
-axum = { version = "0.7", features = ["macros", "multipart"] }
-tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
-bytes = "1"
-futures = "0.3"
-async-stream = "0.3"
-tokio-stream = "0.1"
-anyhow = "1"
-uuid = { version = "1", features = ["v4", "serde"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Async runtime for the in-process HTTP server we own
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
-# Real inference engines — each is feature-gated so the default build
-# stays fast and you only pay for what you opt into. `stt` needs cmake on
-# the build host (`brew install cmake` on macOS).
-#
-# TTS is currently stub-only; `tts-rs` 2026.2.x has an upstream ort/rc
-# version mismatch that breaks its compile. Swap in kokoros (git) or a
-# direct `ort` integration once upstream is unblocked.
-mistralrs = { version = "0.8", optional = true }
-whisper-rs = { version = "0.16", optional = true, default-features = false }
+# The engine substrate — OpenAI-compatible router + inference engines
+protolabs-voice-core = { path = "../crates/protolabs-voice-core" }
 
 [features]
 default = []
-# Individual engines — compose them as needed.
-llm = ["dep:mistralrs"]
-stt = ["dep:whisper-rs"]
-# Placeholder: gates the speech endpoint stub; swap in a crate when ready.
-tts = []
-# Umbrella: all available engines.
-engines = ["llm", "stt", "tts"]
-# GPU backends — harmless no-ops unless the corresponding engine is also on.
-metal = ["mistralrs?/metal", "mistralrs?/accelerate", "whisper-rs?/metal"]
-cuda = ["mistralrs?/cuda", "whisper-rs?/cuda"]
-
-[dev-dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "multipart"] }
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = "s"
-panic = "abort"
-strip = true
+# Re-export protolabs-voice-core feature knobs so `cargo tauri build --features metal`
+# etc. at the protoapp level propagates correctly.
+llm = ["protolabs-voice-core/llm"]
+stt = ["protolabs-voice-core/stt"]
+tts = ["protolabs-voice-core/tts"]
+engines = ["protolabs-voice-core/engines"]
+metal = ["protolabs-voice-core/metal"]
+cuda = ["protolabs-voice-core/cuda"]

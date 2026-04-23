@@ -1,0 +1,40 @@
+[workspace]
+members = ["src-tauri", "crates/protolabs-voice-core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["protolabs"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/protolabsai/protoApp"
+
+[workspace.dependencies]
+# Shared runtime + HTTP — pinned here so every member uses the same versions.
+axum = { version = "0.7", features = ["macros", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+bytes = "1"
+futures = "0.3"
+async-stream = "0.3"
+tokio-stream = "0.1"
+anyhow = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Feature-gated engines — same pinning rules apply.
+mistralrs = "0.8"
+whisper-rs = { version = "0.16", default-features = false }
+
+# Dev deps
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "multipart"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
