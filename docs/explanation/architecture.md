@@ -36,7 +36,7 @@ and skipped HTTP entirely. We didn't, because:
 
 1. **OpenAI SDK drop-in** — `new OpenAI({ baseURL })` works unchanged. Tauri-command-shaped APIs would need a custom shim.
 2. **External tooling** — curl, LangChain.js, the Vercel AI SDK, any OpenAI-compatible client can hit `http://127.0.0.1:<port>/v1` during dev. Great for debugging and scripting.
-3. **Same-origin security** — binding to `127.0.0.1` only makes the surface safe by construction. No authentication needed.
+3. **Loopback + CORS as the security wall.** Binding to `127.0.0.1` keeps the socket unreachable from the network, but **not** from other pages in the user's browser — any site they visit can issue `fetch("http://127.0.0.1:<port>/v1/...")`. We defend against that by narrowing CORS to loopback origins and the Tauri webview schemes in `crates/protolabs-voice-core/src/api/mod.rs`. No authentication layer beyond that today; if you expose this over the network (via a reverse proxy, ngrok, etc.) you need to add one.
 
 The cost is one extra JSON hop vs direct in-process calls
 (~1–3 ms) — negligible next to model inference time.

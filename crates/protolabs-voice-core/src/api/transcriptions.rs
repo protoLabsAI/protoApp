@@ -1,11 +1,11 @@
 //! `POST /v1/audio/transcriptions` — OpenAI-compatible STT endpoint.
 //!
-//! Multipart form: `file`, `model`, `language?`, `response_format?`.
+//! Multipart form: `file`, `model`, `response_format?`.
 //! Returns `{"text": "..."}` on `json` (default) or the raw text when the
 //! client asks for `response_format=text`.
 //!
-//! Without the `engines` feature, we return a stub acknowledging the file
-//! size so the frontend plumbing can be exercised end-to-end.
+//! Without the `stt` feature, we return a stub acknowledging the file size
+//! so the frontend plumbing can be exercised end-to-end.
 
 use std::sync::Arc;
 
@@ -42,7 +42,14 @@ pub async fn create(
                 };
             }
             "model" => {
-                model = field.text().await.unwrap_or_default();
+                // Only overwrite the default on a successful read — a failed
+                // multipart parse should leave the "whisper-large-v3-turbo"
+                // default intact, not blank it.
+                if let Ok(v) = field.text().await {
+                    if !v.is_empty() {
+                        model = v;
+                    }
+                }
             }
             "response_format" => {
                 response_format = field.text().await.unwrap_or_else(|_| "json".into());
@@ -68,8 +75,8 @@ pub async fn create(
 #[cfg(not(feature = "stt"))]
 async fn transcribe(bytes: &[u8], model: &str) -> String {
     format!(
-        "[stub transcription — build with `--features stt` to enable whisper-rs] \
-         received {} bytes for model {}",
+        "[stub transcription — build with `--features stt` to enable whisper-rs; \
+         needs cmake on the build host] received {} bytes for model {}",
         bytes.len(),
         model
     )

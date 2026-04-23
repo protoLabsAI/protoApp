@@ -90,9 +90,17 @@ Non-fatal. The host decides whether to surface or retry.
 
 ## Extending
 
-Both enums are `#[non_exhaustive]` in spirit — add new variants by
-appending. Older hosts see the new variant as an `Unknown`-style error
-and log it; that's desirable fail-soft behavior.
+Append-only evolution: add new variants, never remove or rename. Note
+that the types **are not** `#[non_exhaustive]` today — serde's tagged
+enum deserializer will hard-error on an unknown `type` tag. An older
+host talking to a newer sidecar will see this as an
+`IncomingMessage` parse error bubbling up through `Client::next()`.
+
+If you need fail-soft compatibility across versions, either:
+- bump the major version on both sides at the same time, or
+- open a PR to add an explicit `Unknown { type: String, raw: Value }`
+  variant backed by a custom deserializer, and mark the enums
+  `#[non_exhaustive]`.
 
 ## Reference implementation (Rust)
 

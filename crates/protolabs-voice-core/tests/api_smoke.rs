@@ -50,16 +50,27 @@ async fn chat_completions_streams_sse_and_terminates() {
         .expect("post");
     assert!(resp.status().is_success());
 
+    // Guard the stream with both a byte cap and a wall-clock deadline so a
+    // missing [DONE] or a server bug can't hang CI.
+    const MAX_BYTES: usize = 64 * 1024;
+    const DEADLINE: std::time::Duration = std::time::Duration::from_secs(15);
+
     let mut stream = resp.bytes_stream();
     let mut buf = String::new();
-    while let Some(chunk) = stream.next().await {
-        let bytes = chunk.expect("chunk");
-        buf.push_str(&String::from_utf8_lossy(&bytes));
-        if buf.contains("[DONE]") {
-            break;
+    let read_loop = async {
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.expect("chunk");
+            buf.push_str(&String::from_utf8_lossy(&bytes));
+            if buf.contains("[DONE]") || buf.len() >= MAX_BYTES {
+                break;
+            }
         }
-    }
+    };
+    tokio::time::timeout(DEADLINE, read_loop)
+        .await
+        .expect("timed out waiting for [DONE]");
 
+    assert!(buf.len() < MAX_BYTES, "read cap hit before [DONE]: {buf:?}");
     assert!(buf.contains("data: "), "expected SSE data: frames, got {buf:?}");
     assert!(buf.contains("chat.completion.chunk"), "expected object label");
     assert!(buf.contains("[DONE]"), "expected terminator");
@@ -134,6 +145,25 @@ async fn speech_rejects_empty_input() {
         .await
         .expect("post");
     assert_eq!(resp.status(), 400);
+}
+
+#[tokio::test]
+async fn chat_completions_rejects_unknown_model() {
+    let (addr, fut) = api::bind().await.expect("bind");
+    tokio::spawn(fut);
+
+    let resp = reqwest::Client::new()
+        .post(format!("http://{addr}/v1/chat/completions"))
+        .json(&json!({
+            "model": "some-model-we-dont-serve",
+            "messages": [{"role": "user", "content": "hi"}]
+        }))
+        .send()
+        .await
+        .expect("post");
+    assert_eq!(resp.status(), 404);
+    let body: serde_json::Value = resp.json().await.expect("json");
+    assert_eq!(body["error"]["code"], "model_not_found");
 }
 
 #[tokio::test]

@@ -9,6 +9,7 @@ unchanged — you only rewrite the `baseURL`.
 ```ts
 import OpenAI from "openai";
 import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
 
 const base = await invoke<string>("get_api_base_url");
 const client = new OpenAI({
@@ -17,16 +18,26 @@ const client = new OpenAI({
   dangerouslyAllowBrowser: true,      // we're same-origin to localhost
 });
 
-const stream = await client.chat.completions.create({
-  model: "gemma-4-e2b",
-  messages: [{ role: "user", content: "hello" }],
-  stream: true,
-});
+function Example() {
+  const [reply, setReply] = useState("");
 
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+  async function ask() {
+    const stream = await client.chat.completions.create({
+      model: "gemma-4-e2b",
+      messages: [{ role: "user", content: "hello" }],
+      stream: true,
+    });
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      setReply((prev) => prev + delta);  // browser-friendly sink
+    }
+  }
+  // ...
 }
 ```
+
+(The webview has no `process.stdout` — use React state, `console.log`,
+or any DOM-aware sink instead.)
 
 ## The pre-built hook
 

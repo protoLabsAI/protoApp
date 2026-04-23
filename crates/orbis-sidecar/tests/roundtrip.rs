@@ -31,22 +31,29 @@ async fn handle_socket(mut socket: WebSocket) {
     // Echo-reply pattern: whatever user text arrives, reply with 3 tokens then turn_end.
     while let Some(Ok(msg)) = socket.recv().await {
         if let AxMsg::Text(t) = msg {
-            let parsed: OutgoingMessage = serde_json::from_str(&t).unwrap();
+            let parsed: OutgoingMessage = serde_json::from_str(&t)
+                .expect("parse OutgoingMessage in mock handle_socket");
             if let OutgoingMessage::User { text } = parsed {
                 for word in ["got:", text.as_str(), "done."].iter() {
                     let reply = IncomingMessage::Token {
                         text: format!("{word} "),
                     };
-                    let s = serde_json::to_string(&reply).unwrap();
-                    socket.send(AxMsg::Text(s.into())).await.unwrap();
+                    let s = serde_json::to_string(&reply)
+                        .expect("serialize Token reply in mock handle_socket");
+                    socket
+                        .send(AxMsg::Text(s.into()))
+                        .await
+                        .expect("send Token reply in mock handle_socket");
                 }
                 let end = IncomingMessage::TurnEnd {
                     finish_reason: Some("stop".into()),
                 };
+                let s = serde_json::to_string(&end)
+                    .expect("serialize TurnEnd in mock handle_socket");
                 socket
-                    .send(AxMsg::Text(serde_json::to_string(&end).unwrap().into()))
+                    .send(AxMsg::Text(s.into()))
                     .await
-                    .unwrap();
+                    .expect("send TurnEnd in mock handle_socket");
             }
         }
     }

@@ -44,21 +44,17 @@ pub async fn create(
     let audio = synthesize(&req.input, voice).await;
 
     let fmt = req.response_format.as_deref().unwrap_or("wav");
-    let mime = match fmt {
-        "mp3" => "audio/mpeg",
-        _ => "audio/wav",
-    };
-
     let mut headers = HeaderMap::new();
+    // Always WAV on the wire today; mp3 transcoding is a TODO. We surface
+    // that to clients that asked for mp3 via a custom header so they can
+    // warn users instead of silently failing to play the audio.
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/wav"));
     if fmt == "mp3" {
-        // We don't transcode yet; advertise wav even if client asked mp3.
         headers.insert(
             "x-protoapp-note",
             HeaderValue::from_static("mp3 encoding not yet implemented; returning wav"),
         );
     }
-    let _ = mime; // silence unused until transcoding lands
     (headers, Body::from(audio)).into_response()
 }
 

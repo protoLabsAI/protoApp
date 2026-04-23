@@ -24,6 +24,19 @@ export function getOpenAI(): Promise<OpenAI> {
   return clientPromise;
 }
 
+/**
+ * Synchronous accessor for the cached base URL — useful when you only need
+ * it for display or deep-linking and don't want to block on the Tauri
+ * command.
+ *
+ * Returns `null` until {@link getOpenAI} has resolved at least once. If you
+ * need the URL before then, `await getOpenAI()` first:
+ *
+ * ```ts
+ * await getOpenAI();
+ * const base = getBaseUrl(); // now guaranteed non-null
+ * ```
+ */
 export function getBaseUrl(): string | null {
   return cachedBaseUrl;
 }

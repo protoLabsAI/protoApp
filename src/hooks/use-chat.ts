@@ -19,10 +19,21 @@ export function useChat({
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Synchronous guard — React state updates are async, so two rapid send()
+  // calls could both pass `!isStreaming` before either render lands. This
+  // ref is set before any await and checked before we commit to a run.
+  const isStreamingRef = useRef(false);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    isStreamingRef.current = false;
+  }, []);
 
   const send = useCallback(
     async (input: string) => {
-      if (!input.trim() || isStreaming) return;
+      if (!input.trim() || isStreamingRef.current) return;
+      isStreamingRef.current = true;
 
       setError(null);
       setIsStreaming(true);
@@ -63,20 +74,20 @@ export function useChat({
         }
       } finally {
         setIsStreaming(false);
+        isStreamingRef.current = false;
         abortRef.current = null;
       }
     },
-    [messages, isStreaming, model, systemPrompt],
+    [messages, model, systemPrompt],
   );
 
-  const stop = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
-
   const clear = useCallback(() => {
+    // Abort any in-flight request before wiping state so tokens from a
+    // stale stream can't mutate the freshly-cleared message list.
+    stop();
     setMessages([]);
     setError(null);
-  }, []);
+  }, [stop]);
 
   return { messages, send, stop, clear, isStreaming, error };
 }

@@ -43,9 +43,13 @@ while let Some(msg) = client.next().await {
 
 ## 3. Tauri lifecycle
 
-Tie `sidecar.shutdown(grace)` to your Tauri `RunEvent::ExitRequested`:
+Tie `sidecar.shutdown(grace)` to `RunEvent::ExitRequested` (app-level),
+**not** `WindowEvent::CloseRequested` — you want the sidecar alive until
+the whole app is exiting, not just one window:
 
 ```rust
+use tauri::{Manager, RunEvent};
+
 tauri::Builder::default()
     .setup(|app| {
         let sidecar = tauri::async_runtime::block_on(
@@ -54,15 +58,15 @@ tauri::Builder::default()
         app.manage(sidecar);
         Ok(())
     })
-    .on_window_event(|window, event| {
-        if let tauri::WindowEvent::CloseRequested { .. } = event {
-            let sidecar = window.state::<Sidecar>();
+    .build(ctx)?
+    .run(|app_handle, event| {
+        if let RunEvent::ExitRequested { .. } = event {
+            let sidecar = app_handle.state::<Sidecar>();
             tauri::async_runtime::block_on(
                 sidecar.shutdown(std::time::Duration::from_secs(2))
             );
         }
-    })
-    .run(ctx)
+    });
 ```
 
 ## 4. Bundle the Python binary

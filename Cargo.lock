@@ -5446,6 +5446,7 @@ dependencies = [
  "tokio-stream",
  "tower-http",
  "tracing",
+ "url",
  "uuid 1.23.1",
  "whisper-rs",
 ]

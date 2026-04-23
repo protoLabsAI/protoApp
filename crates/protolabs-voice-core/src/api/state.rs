@@ -4,17 +4,16 @@ use std::sync::Arc;
 ///
 /// The LLM slot is a `OnceCell` so the first chat request pays the load cost
 /// and every concurrent caller afterwards waits on the same cell.
+#[derive(Default)]
 pub struct AppState {
     #[cfg(feature = "llm")]
     pub llm: tokio::sync::OnceCell<mistralrs::Model>,
 }
 
 impl AppState {
+    /// Kept for call-site clarity; equivalent to `AppState::default()`.
     pub fn new() -> Self {
-        Self {
-            #[cfg(feature = "llm")]
-            llm: tokio::sync::OnceCell::new(),
-        }
+        Self::default()
     }
 }
 

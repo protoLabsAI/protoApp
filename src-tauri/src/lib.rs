@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use protolabs_voice_core::{self as voice_core, AppState};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_specta::{Builder, collect_commands};
 
 mod commands;
@@ -53,9 +53,21 @@ pub fn run() {
                 voice_core::bind_with_state(state.clone()).await
             })?;
             tracing::info!(%addr, "OpenAI-compatible server listening");
+
+            let app_handle = app.handle().clone();
             handle.spawn(async move {
-                if let Err(e) = server_fut.await {
-                    tracing::error!(?e, "api server exited with error");
+                match server_fut.await {
+                    Ok(()) => tracing::info!("api server exited cleanly"),
+                    Err(e) => {
+                        tracing::error!(?e, "api server exited with error");
+                        // The frontend chat/voice panels are useless without
+                        // the server — tell the UI so it can show a banner
+                        // and surface the error instead of silently hanging.
+                        let _ = app_handle.emit(
+                            "api-server-error",
+                            serde_json::json!({ "error": e.to_string() }),
+                        );
+                    }
                 }
             });
             app.manage(ApiServer { addr });

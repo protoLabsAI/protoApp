@@ -6,9 +6,9 @@ real Gemma 4 E2B inference via mistralrs.
 
 ## What you'll build
 
-The chat UI unchanged, but replies come from a **2 GB Gemma 4 E2B model
-downloaded from Hugging Face** and run locally on your GPU (Metal on
-Apple Silicon, CUDA on NVIDIA).
+The chat UI unchanged, but replies come from **Gemma 4 E2B** downloaded
+from Hugging Face (≈1.5 GB on disk, ~2 GB VRAM at runtime) and run
+locally on your GPU (Metal on Apple Silicon, CUDA on NVIDIA).
 
 ## 1. Budget your time
 

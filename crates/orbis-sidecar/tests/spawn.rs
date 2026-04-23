@@ -55,3 +55,44 @@ async fn errors_when_child_exits_before_ready() {
     let res = Sidecar::spawn(cfg).await;
     assert!(matches!(res, Err(orbis_sidecar::SpawnError::EarlyExit)));
 }
+
+#[tokio::test]
+async fn errors_on_malformed_ready_line() {
+    let cfg = SpawnConfig {
+        program: std::path::PathBuf::from("sh"),
+        args: vec![
+            "-c".into(),
+            // Missing ws:// scheme — should be rejected even though the
+            // prefix matches.
+            "echo 'ORBIS_READY not-a-valid-url'; exec cat".into(),
+        ],
+        readiness_timeout: Duration::from_secs(5),
+        env: vec![],
+    };
+    let res = Sidecar::spawn(cfg).await;
+    assert!(
+        matches!(res, Err(orbis_sidecar::SpawnError::UnparsableReadyLine(_))),
+        "expected UnparsableReadyLine for malformed URL"
+    );
+}
+
+#[tokio::test]
+async fn errors_when_ready_line_points_to_remote_host() {
+    let cfg = SpawnConfig {
+        program: std::path::PathBuf::from("sh"),
+        args: vec![
+            "-c".into(),
+            // Well-formed ws URL but not a loopback host — must be
+            // rejected to stop a compromised sidecar from redirecting
+            // the client to an attacker-controlled server.
+            "echo 'ORBIS_READY ws://evil.example.com:9000/ws'; exec cat".into(),
+        ],
+        readiness_timeout: Duration::from_secs(5),
+        env: vec![],
+    };
+    let res = Sidecar::spawn(cfg).await;
+    assert!(
+        matches!(res, Err(orbis_sidecar::SpawnError::UnparsableReadyLine(_))),
+        "expected UnparsableReadyLine for remote host"
+    );
+}

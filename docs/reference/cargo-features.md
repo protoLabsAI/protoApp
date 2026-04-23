@@ -36,7 +36,7 @@ cleanly with no GPU code — because no engine is enabled.
 | Real chat on Apple Silicon | `cargo build -p protoapp --features llm,metal --release` |
 | Real chat on NVIDIA | `cargo build -p protoapp --features llm,cuda --release` |
 | Chat + STT on Apple Silicon (after `brew install cmake`) | `cargo build -p protoapp --features llm,stt,metal --release` |
-| Everything on NVIDIA + FlashAttention 2 | `cargo build -p protoapp --features engines,cuda,flash-attn --release` |
+| Everything on NVIDIA | `cargo build -p protoapp --features engines,cuda --release` (FlashAttention 2 kernels are auto-selected by mistralrs when the GPU supports them; no dedicated feature flag) |
 
 ## Adding a new feature
 

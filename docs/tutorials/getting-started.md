@@ -46,7 +46,10 @@ the window opens, you'll see a chat panel.
 
 Type "hello" and press Send. You should see a streaming reply like:
 
-> \[stub reply — build with `--features metal` (macOS) or `--features cuda` for real Gemma 4 inference\] You said: hello
+> \[stub reply — build with `--features llm` (optionally with `metal` on macOS or `cuda` on NVIDIA, e.g. `--features "llm metal"`) for real Gemma 4 inference\] You said: hello
+
+The `llm` feature is the one that pulls in mistralrs; `metal` and `cuda`
+are GPU backends that only matter once `llm` is on.
 
 That "stub reply" is the point of this tutorial — it proves:
 
@@ -66,8 +69,9 @@ In a second terminal:
 cargo test --workspace
 ```
 
-You should see 11 tests passing across `protolabs-voice-core` (6) and
-`orbis-sidecar` (5).
+You should see every test passing across `protolabs-voice-core` and
+`orbis-sidecar` (counts will drift as the suite grows; what matters is
+"all green").
 
 ## Next
 

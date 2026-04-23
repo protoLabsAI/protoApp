@@ -23,9 +23,11 @@ pnpm tauri dev -- --features llm,cuda
 Requires the CUDA toolkit to be installed — `nvcc --version` must work.
 On Linux, match your driver's CUDA version (usually 12.x).
 
-Optional: `--features llm,cuda,flash-attn` enables FlashAttention 2
-kernels. Needs a modern GPU (Ampere or newer) and roughly doubles
-decode speed on longer contexts.
+FlashAttention 2 kernels aren't exposed as a dedicated feature in this
+workspace; mistralrs enables them automatically when the CUDA backend
+detects a compatible GPU (Ampere or newer). If you need to force the
+FA2 path explicitly, do it with a mistralrs-level cargo flag override
+in your fork; there's no `flash-attn` feature to pass here today.
 
 ## Composing features
 
@@ -34,7 +36,7 @@ You can stack with other engines:
 ```sh
 cargo build -p protoapp --features engines,metal     # all three engines, Metal GPU
 cargo build -p protoapp --features llm,stt,metal     # LLM + STT, no TTS, Metal
-cargo build -p protoapp --features llm,cuda,flash-attn
+cargo build -p protoapp --features llm,cuda          # LLM on NVIDIA
 ```
 
 ## Verifying it's actually on

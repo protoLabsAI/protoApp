@@ -61,9 +61,23 @@ neural TTS, Apache-2.0, 50+ voices across 9 languages, ~10 s of audio
 synthesized in ~1 s on WebGPU and similar on CPU via ONNX Runtime.
 
 **Current blocker**: the crates.io crate
-[`tts-rs`](https://crates.io/crates/tts-rs) (2026.2.x) fails to
-compile against current `ort` releases because of a generic-parameter
-mismatch on `ort::Error<SessionBuilder>`. Reported upstream.
+[`tts-rs`](https://crates.io/crates/tts-rs) fails to compile against
+the `ort` release cargo resolves for it. We tested `2026.2.1`,
+`2026.2.2`, and `2026.2.3`; all three fail the same way. The compile
+error from rustc, abbreviated:
+
+```
+error[E0277]: `?` couldn't convert the error to `KokoroError`:
+  the trait `From<ort::Error<SessionBuilder>>` is not implemented
+  for `KokoroError`
+  --> tts-rs/src/engines/kokoro/model.rs:292:44
+```
+
+ort moved `SessionBuilder` out of (or changed its position in) the
+`Error<T>` generic in a post-rc.10 release; tts-rs's `?` calls against
+the old signature break. Track the upstream issue at
+[rishiskhare/tts-rs](https://github.com/rishiskhare/tts-rs/issues) if
+you need a pointer.
 
 **Options we'll use when unblocked**
 

@@ -8,10 +8,10 @@ use super::state::AppState;
 
 /// `GET /v1/models` — OpenAI-compatible model listing.
 ///
-/// Returns the union of models this server knows how to serve. When the
-/// `engines` feature is off, we still advertise the defaults so the UI can
-/// populate its model picker while the user is deciding whether to enable
-/// real inference.
+/// Returns the union of models this server knows how to serve. With no engine
+/// features enabled we still advertise the defaults so the UI can populate
+/// its model picker while the user is deciding whether to build with
+/// `--features llm`, `--features stt`, etc.
 pub async fn list(State(_): State<Arc<AppState>>) -> Json<ModelList> {
     let data = default_models()
         .into_iter()
@@ -79,4 +79,11 @@ pub fn default_models() -> Vec<LocalModel> {
             kind: ModelKind::Speech,
         },
     ]
+}
+
+/// Lookup: does the catalog contain a chat-capable model with this id?
+pub fn is_chat_model(id: &str) -> bool {
+    default_models()
+        .into_iter()
+        .any(|m| m.id == id && matches!(m.kind, ModelKind::Chat))
 }

@@ -36,12 +36,16 @@ export function Chat() {
       <CardContent className="pt-4 space-y-3">
         <div
           ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-atomic="false"
+          aria-label="Chat transcript"
           className="h-80 overflow-y-auto rounded-md border bg-muted/30 p-3 space-y-2 text-sm"
         >
           {messages.length === 0 && (
             <p className="text-muted-foreground">
-              Say hi to start. Default reply is a stub until the <code>engines</code> cargo
-              feature is built.
+              Say hi to start. Default reply is a stub until the <code>llm</code> cargo
+              feature is built (e.g. <code>--features "llm metal"</code>).
             </p>
           )}
           {messages.map((m, i) => (
@@ -68,7 +72,12 @@ export function Chat() {
         {error && <p className="text-destructive text-sm">{error.message}</p>}
 
         <form onSubmit={onSubmit} className="flex gap-2">
+          <label htmlFor="chat-input" className="sr-only">
+            Message
+          </label>
           <Input
+            id="chat-input"
+            aria-label="Message"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={isStreaming ? "Streaming…" : "Type a message"}

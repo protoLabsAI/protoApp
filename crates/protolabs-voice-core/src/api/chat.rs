@@ -5,8 +5,8 @@
 //!   * `stream: true`  → Server-Sent Events with `data: {...}\n\n` chunks
 //!     terminated by `data: [DONE]\n\n`
 //!
-//! Without the `engines` feature, we emit a placeholder echo so the frontend
-//! plumbing can be exercised end-to-end before pulling in mistralrs.
+//! Without the `llm` feature (or when it's on but model load fails), we emit
+//! a placeholder echo so the frontend plumbing can be exercised end-to-end.
 
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -86,6 +86,24 @@ pub async fn completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,
 ) -> Response {
+    // Reject requests for models we don't serve. We still advertise a model id
+    // even when the real engine isn't compiled in, so the check is against the
+    // catalog — not against whether the engine is actually loaded.
+    if !super::models::is_chat_model(&req.model) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": {
+                    "message": format!("model `{}` not found", req.model),
+                    "type": "invalid_request_error",
+                    "param": "model",
+                    "code": "model_not_found",
+                }
+            })),
+        )
+            .into_response();
+    }
+
     if req.stream {
         stream_response(state, req).await.into_response()
     } else {
@@ -227,7 +245,7 @@ async fn emit_stub(req: &ChatRequest, tx: &tokio::sync::mpsc::Sender<String>) {
         .unwrap_or("(no user message)");
 
     let reply = format!(
-        "[stub reply — build with `--features metal` (macOS) or `--features cuda` for real Gemma 4 inference] \
+        "[stub reply — build with `--features llm` (optionally with `metal` on macOS or `cuda` on NVIDIA, e.g. `--features \"llm metal\"`) for real Gemma 4 inference] \
          You said: {last_user}"
     );
 

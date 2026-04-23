@@ -104,7 +104,7 @@ impl Sidecar {
             }
         };
 
-        if !ws_url.starts_with("ws://") && !ws_url.starts_with("wss://") {
+        if !is_loopback_ws_url(&ws_url) {
             let _ = child.kill().await;
             return Err(SpawnError::UnparsableReadyLine(ws_url));
         }
@@ -148,5 +148,55 @@ impl Drop for Sidecar {
     fn drop(&mut self) {
         // kill_on_drop(true) on the Command takes care of the async case.
         // Nothing else to do — `shutdown()` is the explicit path.
+    }
+}
+
+/// Parse + validate a sidecar-supplied ws URL.
+/// Requires `ws://`/`wss://` and a loopback host — prevents a compromised
+/// child from redirecting our client to a remote server.
+fn is_loopback_ws_url(raw: &str) -> bool {
+    let url = match url::Url::parse(raw) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+    if !matches!(url.scheme(), "ws" | "wss") {
+        return false;
+    }
+    match url.host() {
+        Some(url::Host::Domain(d)) => d == "localhost",
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_loopback_ws_url;
+
+    #[test]
+    fn accepts_loopback_ws_urls() {
+        for u in [
+            "ws://127.0.0.1:19999/ws",
+            "ws://localhost:8080",
+            "wss://127.0.0.1:8443/a/b",
+            "ws://[::1]:9000",
+            "ws://127.5.6.7:1/",
+        ] {
+            assert!(is_loopback_ws_url(u), "should accept: {u}");
+        }
+    }
+
+    #[test]
+    fn rejects_non_loopback_or_malformed() {
+        for u in [
+            "ws://evil.example.com/ws",
+            "http://127.0.0.1:19999",   // wrong scheme
+            "ORBIS_READY=not-a-valid-url",
+            "ws://10.0.0.1/",
+            "",
+        ] {
+            assert!(!is_loopback_ws_url(u), "should reject: {u}");
+        }
     }
 }
