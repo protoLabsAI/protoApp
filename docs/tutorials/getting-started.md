@@ -40,7 +40,8 @@ pnpm tauri dev
 ```
 
 The first launch compiles the Rust workspace (~30 seconds clean). When
-the window opens, you'll see a chat panel.
+the window opens, you'll see three tabs: **Chat**, **Transcribe**,
+and **Speak**.
 
 ## 4. Send a message
 
@@ -61,7 +62,20 @@ That "stub reply" is the point of this tutorial — it proves:
 If any of those steps broke, it would have been obvious — no model to
 blame.
 
-## 5. Run the tests
+## 5. Kick the voice panels
+
+Switch to the **Transcribe** tab, click **Record**, say something for
+a few seconds, click **Stop**. The stub STT echoes back the byte count
+of your clip so you can confirm the mic path, the multipart upload,
+and the server round-trip all work. Real Whisper transcription comes
+online with `--features stt`.
+
+Switch to the **Speak** tab, type something, click **Speak**. You'll
+hear one second of silence — that's the valid WAV the server returns
+while the real Kokoro engine is still pending. The audio element lets
+you confirm playback works; real voice arrives with `--features tts`.
+
+## 6. Run the tests
 
 In a second terminal:
 
