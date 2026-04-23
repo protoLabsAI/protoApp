@@ -19,7 +19,7 @@ vendor the same engine substrate and add a Python agent sidecar.
 | Real whisper-rs STT | scaffolded; awaits [#10](./docs/explanation/engine-choices.md#stt-whisper-rs) |
 | Real Kokoro TTS | scaffolded; awaits [#11](./docs/explanation/engine-choices.md#tts-kokoro-82m-pending) |
 | ORBIS Python sidecar plumbing | shipped as `orbis-sidecar`; awaits ORBIS WS entry point ([#12](./docs/how-to/integrate-orbis-sidecar.md)) |
-| React voice panels (mic / TTS playback) | [#13](./docs/tutorials/README.md) |
+| React voice panels (mic / TTS playback) | shipped as Transcribe + Speak tabs; work against stubs today, pick up real engines automatically |
 
 ## Quick start
 
