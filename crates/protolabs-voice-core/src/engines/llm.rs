@@ -70,6 +70,8 @@ pub async fn load_default() -> Result<Model> {
 pub async fn stream(
     model: &Model,
     history: Vec<ChatMessage>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
     tx: mpsc::Sender<String>,
 ) -> std::result::Result<(), String> {
     let mut request = RequestBuilder::new();
@@ -87,6 +89,15 @@ pub async fn stream(
             }
         };
         request = request.add_message(role, msg.content.clone());
+    }
+
+    // Forward OpenAI sampling controls into mistralrs. Silently dropped when
+    // absent — this matches OpenAI's behavior (server-side defaults apply).
+    if let Some(t) = temperature {
+        request = request.set_sampler_temperature(t as f64);
+    }
+    if let Some(m) = max_tokens {
+        request = request.set_sampler_max_len(m as usize);
     }
 
     let mut stream = model

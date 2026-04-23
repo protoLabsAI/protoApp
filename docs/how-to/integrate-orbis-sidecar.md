@@ -21,8 +21,15 @@ That's the full contract. Nothing else is mandatory.
 use orbis_sidecar::{Sidecar, SpawnConfig, OutgoingMessage, IncomingMessage};
 use std::time::Duration;
 
+// Resolve the sidecar binary at runtime — e.g. via tauri::api::path::resource_dir()
+// on desktop, an environment variable in dev, or plain PATH lookup for CLIs.
+// Hard-coded macOS bundle paths break Linux, Windows, and `cargo run` workflows.
+let program = std::env::var("ORBIS_BIN")
+    .map(std::path::PathBuf::from)
+    .unwrap_or_else(|_| std::path::PathBuf::from("orbis"));
+
 let sidecar = Sidecar::spawn(SpawnConfig {
-    program: "/Applications/protoApp.app/Contents/Resources/orbis".into(),
+    program,
     args: vec![],
     readiness_timeout: Duration::from_secs(30),
     env: vec![("ORBIS_LOG_LEVEL".into(), "info".into())],

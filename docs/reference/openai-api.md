@@ -4,8 +4,12 @@ Served by `protolabs-voice-core` at `http://127.0.0.1:<ephemeral>/v1/*`.
 The port is chosen at startup and surfaced to the frontend via the
 [`get_api_base_url`](./tauri-commands.md#get_api_base_url) Tauri command.
 
-Request/response shapes match OpenAI's specification exactly so any
-OpenAI SDK works unchanged.
+Request/response shapes are OpenAI-compatible — compatible enough that
+the standard OpenAI SDKs work without changes — but not a 100 % replica.
+Known deviations: some endpoints are stubbed (see "Status" column below),
+error bodies mix JSON and plain text per endpoint, and `audio/speech`
+always returns WAV even when the client asks for mp3 (the advisory
+`x-protoapp-note` header flags this).
 
 ## Endpoints
 
@@ -139,9 +143,8 @@ ok
     }
   }
   ```
-- `POST /v1/audio/transcriptions` and `POST /v1/audio/speech` return
-  plain text reasons (e.g. `` `input` must not be empty ``) for simple
-  validation failures, and OpenAI-style JSON for model lookups.
+- `POST /v1/audio/transcriptions` returns plain text reasons for validation failures (e.g. `` `input` must not be empty ``, `unsupported response_format`, `invalid multipart body`). No model-lookup JSON yet.
+- `POST /v1/audio/speech` returns plain text reasons for simple validation failures and OpenAI-style JSON for model lookup failures (unknown TTS model → 404 with `"code": "model_not_found"`).
 
 5xx: real engine failure. `/v1/chat/completions` returns the same
 OpenAI JSON shape with `"code": "backend_failure"`. The stub fallback

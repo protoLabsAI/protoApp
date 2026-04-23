@@ -15,7 +15,7 @@ const base = await invoke<string>("get_api_base_url");
 const client = new OpenAI({
   baseURL: `${base}/v1`,
   apiKey: "local",                    // server ignores, SDK requires something
-  dangerouslyAllowBrowser: true,      // we're same-origin to localhost
+  dangerouslyAllowBrowser: true,      // calling a trusted loopback server from the Tauri webview
 });
 
 function Example() {
@@ -59,6 +59,6 @@ function MyChat() {
 ## Notes
 
 - The `baseURL` includes the `/v1` prefix. OpenAI's SDK appends paths like `/chat/completions`, so we get `http://127.0.0.1:<port>/v1/chat/completions` as expected.
-- `dangerouslyAllowBrowser: true` is required because OpenAI's SDK defends against exposing a real API key in the browser. We don't have a real key — the check is a formality for our localhost case.
-- CORS is already wide-open in the router (`Any`/`Any`/`Any`). Same-origin to `http://127.0.0.1` doesn't even need it, but cross-origin tools (curl in DevTools, LangChain.js on a different page) work too.
+- `dangerouslyAllowBrowser: true` is required because OpenAI's SDK defends against exposing a real API key in the browser. We don't have a real key — the check is a formality for a trusted loopback target.
+- The Tauri webview is cross-origin to `http://127.0.0.1:<port>`, so browser calls rely on the server's loopback-only CORS allowlist. CLI tools like `curl` aren't affected by CORS; browser access from origins outside the allowlist is denied by design.
 - Audio endpoints work the same way: `client.audio.transcriptions.create(...)` and `client.audio.speech.create(...)`.

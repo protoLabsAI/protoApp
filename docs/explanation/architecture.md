@@ -5,11 +5,15 @@
 protoApp is a Tauri desktop app where **the Rust host process runs a
 local OpenAI-compatible HTTP server**, and the React frontend talks to
 that server using the standard `openai` npm package — same SDK,
-different `baseURL`. The server is backed by in-process Rust inference
-engines (mistralrs for LLM, whisper-rs for STT, kokoros for TTS). A
-second workspace crate, `orbis-sidecar`, provides the plumbing for a
-Python agent process to hang off this system for higher-order
-reasoning without ever touching the audio hot path.
+different `baseURL`. The LLM path is backed by mistralrs in-process
+today (feature-gated behind `--features llm`). STT and TTS are
+scaffolded with identical endpoint shapes — whisper-rs (STT) and
+Kokoro (TTS) are the intended engines, wired in once their upstream
+crates are buildable; see
+[`docs/explanation/engine-choices.md`](./engine-choices.md) for the
+status of each. A second workspace crate, `orbis-sidecar`, provides
+the plumbing for a Python agent process to hang off this system for
+higher-order reasoning without ever touching the audio hot path.
 
 ## Why Tauri + in-process Rust inference
 

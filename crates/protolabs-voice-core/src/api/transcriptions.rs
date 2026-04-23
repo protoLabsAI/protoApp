@@ -30,7 +30,22 @@ pub async fn create(
     let mut model = "whisper-large-v3-turbo".to_string();
     let mut response_format = "json".to_string();
 
-    while let Ok(Some(field)) = form.next_field().await {
+    loop {
+        let field = match form.next_field().await {
+            Ok(Some(f)) => f,
+            Ok(None) => break, // end of form
+            Err(e) => {
+                // A malformed multipart body used to be silently truncated —
+                // callers now get a 400 so partial accepts can't masquerade
+                // as successful requests.
+                return (
+                    StatusCode::BAD_REQUEST,
+                    format!("invalid multipart body: {e}"),
+                )
+                    .into_response();
+            }
+        };
+
         match field.name().unwrap_or("").to_string().as_str() {
             "file" => {
                 audio_bytes = match field.bytes().await {
@@ -64,11 +79,26 @@ pub async fn create(
         return (StatusCode::BAD_REQUEST, "missing `file` field").into_response();
     }
 
+    // Validate response_format before doing any work so invalid requests
+    // fail fast rather than getting a JSON body they didn't ask for.
+    let fmt_response = match response_format.as_str() {
+        "json" => false,
+        "text" => true,
+        other => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("unsupported `response_format`: `{other}`; use `json` or `text`"),
+            )
+                .into_response();
+        }
+    };
+
     let text = transcribe(&audio_bytes, &model).await;
 
-    match response_format.as_str() {
-        "text" => text.into_response(),
-        _ => Json(TranscriptionResponse { text }).into_response(),
+    if fmt_response {
+        text.into_response()
+    } else {
+        Json(TranscriptionResponse { text }).into_response()
     }
 }
 

@@ -152,14 +152,21 @@ impl Drop for Sidecar {
 }
 
 /// Parse + validate a sidecar-supplied ws URL.
-/// Requires `ws://`/`wss://` and a loopback host — prevents a compromised
-/// child from redirecting our client to a remote server.
+/// Requires `ws://`/`wss://`, a loopback host, **and an explicit port** —
+/// prevents a compromised child from redirecting our client to a remote
+/// server, and rejects ambiguous URLs that would fall back to the scheme's
+/// default port (ws:80 / wss:443).
 fn is_loopback_ws_url(raw: &str) -> bool {
     let url = match url::Url::parse(raw) {
         Ok(u) => u,
         Err(_) => return false,
     };
     if !matches!(url.scheme(), "ws" | "wss") {
+        return false;
+    }
+    // `port()` returns `None` when the URL would rely on the scheme default
+    // port. We require an explicit one so the sidecar can't surprise us.
+    if url.port().is_none() {
         return false;
     }
     match url.host() {
@@ -195,6 +202,10 @@ mod tests {
             "ORBIS_READY=not-a-valid-url",
             "ws://10.0.0.1/",
             "",
+            // Missing explicit port — would silently rely on scheme default.
+            "ws://127.0.0.1/",
+            "ws://localhost",
+            "wss://127.0.0.1/x",
         ] {
             assert!(!is_loopback_ws_url(u), "should reject: {u}");
         }

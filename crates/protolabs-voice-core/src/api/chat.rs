@@ -272,9 +272,15 @@ async fn drive_backend(
     {
         match _state.llm_or_load().await {
             Ok(model) => {
-                let outcome = crate::engines::llm::stream(model, req.messages, tx)
-                    .await
-                    .map_err(|message| BackendError { message });
+                let outcome = crate::engines::llm::stream(
+                    model,
+                    req.messages,
+                    req.temperature,
+                    req.max_tokens,
+                    tx,
+                )
+                .await
+                .map_err(|message| BackendError { message });
                 let _ = done.send(outcome);
                 return;
             }

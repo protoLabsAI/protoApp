@@ -30,6 +30,10 @@ that you can hear them.
 
 **Rust owns the hot path. Python owns the brain. They talk via WebSocket.**
 
+> Target state. The Rust voice-core crate + `orbis-sidecar` transport are in
+> place and tested; the ORBIS Python sidecar is not yet wired end-to-end in
+> this PR. See the README roadmap entry for the integration task.
+
 ```
 ┌──────────────── Tauri process (Rust) ─────────────────┐
 │                                                        │

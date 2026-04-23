@@ -6,7 +6,7 @@
 //! so a request for `"mp3"` still receives WAV bytes plus an advisory
 //! `x-protoapp-note` header.
 //!
-//! Without the `engines` feature we return a minimal valid WAV containing
+//! Without the `tts` feature we return a minimal valid WAV containing
 //! silence so the client can still play back something and we can verify the
 //! transport end-to-end.
 

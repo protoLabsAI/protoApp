@@ -48,25 +48,35 @@ export function Chat() {
               feature is built (e.g. <code>--features "llm metal"</code>).
             </p>
           )}
-          {messages.map((m, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: message order is stable within a session
-              key={i}
-              className={cn(
-                "rounded-md px-3 py-2 whitespace-pre-wrap",
-                m.role === "user"
-                  ? "bg-primary/10 ml-8"
-                  : m.role === "assistant"
-                    ? "bg-background mr-8 border"
-                    : "bg-muted text-muted-foreground",
-              )}
-            >
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                {m.role}
+          {messages.map((m, i) => {
+            // Hide the empty assistant placeholder that `send()` inserts
+            // before the first token arrives, unless we're actively
+            // streaming into it. A failed turn that never yielded any
+            // content shouldn't leave a silent ghost bubble behind.
+            const isLast = i === messages.length - 1;
+            if (m.role === "assistant" && !m.content && !(isStreaming && isLast)) {
+              return null;
+            }
+            return (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: message order is stable within a session
+                key={i}
+                className={cn(
+                  "rounded-md px-3 py-2 whitespace-pre-wrap",
+                  m.role === "user"
+                    ? "bg-primary/10 ml-8"
+                    : m.role === "assistant"
+                      ? "bg-background mr-8 border"
+                      : "bg-muted text-muted-foreground",
+                )}
+              >
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  {m.role}
+                </div>
+                {m.content || (isStreaming && isLast ? "…" : "")}
               </div>
-              {m.content || (isStreaming && i === messages.length - 1 ? "…" : "")}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {error && (

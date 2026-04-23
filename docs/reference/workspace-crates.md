@@ -17,7 +17,7 @@ protoApp/
 └── docs/                            # this directory
 ```
 
-## `protoapp` — `src-tauri/`
+## `protoApp` — `src-tauri/`
 
 The Tauri shell. Thin by design — owns:
 - Tauri lifecycle (setup, commands, state)

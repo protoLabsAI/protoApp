@@ -50,8 +50,17 @@ frontend sends in `ChatRequest.model` so the picker UI doesn't desync.
 
 ## 4. Rebuild
 
+Pick the right features for your platform:
+
 ```sh
+# Apple Silicon (Metal)
 cargo build -p protoapp --features llm,metal --release
+
+# NVIDIA
+cargo build -p protoapp --features llm,cuda --release
+
+# CPU-only (slow, but no GPU toolchain needed)
+cargo build -p protoapp --features llm --release
 ```
 
 mistralrs caches weights per-repo, so swapping downloads the new GGUF
