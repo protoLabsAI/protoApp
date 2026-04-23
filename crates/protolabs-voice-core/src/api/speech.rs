@@ -1,8 +1,10 @@
 //! `POST /v1/audio/speech` — OpenAI-compatible TTS endpoint.
 //!
 //! JSON body: `{ "model": "kokoro-82m", "input": "...", "voice": "af_heart",
-//! "response_format": "wav" | "mp3" }`. Returns raw audio bytes with the
-//! matching `Content-Type`.
+//! "response_format": "wav" | "mp3" }`. Returns raw audio bytes with
+//! `Content-Type: audio/wav` today — mp3 transcoding is not yet implemented,
+//! so a request for `"mp3"` still receives WAV bytes plus an advisory
+//! `x-protoapp-note` header.
 //!
 //! Without the `engines` feature we return a minimal valid WAV containing
 //! silence so the client can still play back something and we can verify the

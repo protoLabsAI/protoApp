@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock};
 
 use axum::Json;
 use axum::extract::State;
@@ -81,16 +82,27 @@ pub fn default_models() -> Vec<LocalModel> {
     ]
 }
 
-/// Lookup: does the catalog contain a chat-capable model with this id?
-pub fn is_chat_model(id: &str) -> bool {
+// O(1) lookup tables built once from the single `default_models()` source of
+// truth, so adding a model only touches that one function.
+static CHAT_MODELS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ids_for_kind(ModelKind::Chat));
+static SPEECH_MODELS: LazyLock<HashSet<&'static str>> =
+    LazyLock::new(|| ids_for_kind(ModelKind::Speech));
+
+fn ids_for_kind(kind: ModelKind) -> HashSet<&'static str> {
     default_models()
         .into_iter()
-        .any(|m| m.id == id && matches!(m.kind, ModelKind::Chat))
+        .filter(|m| std::mem::discriminant(&m.kind) == std::mem::discriminant(&kind))
+        .map(|m| m.id)
+        .collect()
+}
+
+/// Lookup: does the catalog contain a chat-capable model with this id?
+pub fn is_chat_model(id: &str) -> bool {
+    CHAT_MODELS.contains(id)
 }
 
 /// Lookup: does the catalog contain a speech-capable (TTS) model with this id?
 pub fn is_speech_model(id: &str) -> bool {
-    default_models()
-        .into_iter()
-        .any(|m| m.id == id && matches!(m.kind, ModelKind::Speech))
+    SPEECH_MODELS.contains(id)
 }

@@ -69,7 +69,11 @@ export function Chat() {
           ))}
         </div>
 
-        {error && <p className="text-destructive text-sm">{error.message}</p>}
+        {error && (
+          <p role="alert" aria-live="assertive" className="text-destructive text-sm">
+            {error.message}
+          </p>
+        )}
 
         <form onSubmit={onSubmit} className="flex gap-2">
           <label htmlFor="chat-input" className="sr-only">

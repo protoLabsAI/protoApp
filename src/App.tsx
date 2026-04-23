@@ -14,7 +14,12 @@ function App() {
             <h1 className="text-lg font-semibold">protoApp</h1>
             <Badge variant="secondary">v{__APP_VERSION__}</Badge>
           </div>
-          <Button variant="outline" size="sm" onClick={toggleTheme}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          >
             {theme === "light" ? "Dark" : "Light"}
           </Button>
         </div>
