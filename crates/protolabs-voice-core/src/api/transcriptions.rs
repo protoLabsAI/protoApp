@@ -92,6 +92,24 @@ pub async fn create(
         return (StatusCode::BAD_REQUEST, "missing `file` field").into_response();
     }
 
+    // Reject unknown transcription model ids fail-fast (mirrors the chat and
+    // speech endpoints) so a typo or a hallucinated id doesn't get a real
+    // Whisper result returned under a bogus label.
+    if !super::models::is_transcription_model(&model) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": {
+                    "message": format!("transcription model `{model}` not found"),
+                    "type": "invalid_request_error",
+                    "param": "model",
+                    "code": "model_not_found",
+                }
+            })),
+        )
+            .into_response();
+    }
+
     // Validate response_format before doing any work so invalid requests
     // fail fast rather than getting a JSON body they didn't ask for.
     let fmt_response = match response_format.as_str() {
@@ -144,15 +162,10 @@ async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
 }
 
 #[cfg(feature = "stt")]
-async fn transcribe(bytes: &[u8], model: &str) -> Result<String, String> {
-    // The `model` parameter is accepted but our local STT path is always the
-    // one cached whisper model — validate the caller at least asked for a
-    // transcription-capable id so the request fails deterministically for
-    // obviously-wrong clients instead of silently returning a Whisper result
-    // under a bogus label.
-    if !super::models::is_transcription_model(model) {
-        tracing::warn!(requested_model = %model, "unknown transcription model id");
-    }
+async fn transcribe(bytes: &[u8], _model: &str) -> Result<String, String> {
+    // Model-id validation happens in the outer handler, not here — by this
+    // point we've already confirmed the caller asked for an id we serve,
+    // which today maps to the single cached whisper model.
     crate::engines::stt::transcribe(bytes)
         .await
         .map_err(|e| e.to_string())
