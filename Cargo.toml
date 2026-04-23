@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri", "crates/protolabs-voice-core"]
+members = ["src-tauri", "crates/protolabs-voice-core", "crates/orbis-sidecar"]
 resolver = "2"
 
 [workspace.package]
@@ -24,6 +24,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "1"
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+url = "2"
 
 # Feature-gated engines — same pinning rules apply.
 mistralrs = "0.8"
