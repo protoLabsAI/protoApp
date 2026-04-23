@@ -25,14 +25,24 @@ url.workspace = true
 # Feature-gated engines
 mistralrs = { workspace = true, optional = true }
 whisper-rs = { workspace = true, optional = true }
+# Kokoro TTS via the lucasjinreal/Kokoros git dep. Publishes no crates.io
+# artifact, so we pin via workspace git reference.
+kokoros = { workspace = true, optional = true }
+# Frontend converts browser recordings to 16 kHz mono WAV before upload
+# (browsers natively decode webm/opus / mp4/aac via Web Audio, then we
+# encode a simple WAV). Server just parses the WAV header with hound —
+# no server-side audio codec stack required.
+hound = { workspace = true, optional = true }
+# Model download (first-use cache) shared by engine modules.
+reqwest = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
 
 [features]
 default = []
 # Individual engines — compose them as needed.
 llm = ["dep:mistralrs"]
-stt = ["dep:whisper-rs"]
-# Placeholder: gates the speech endpoint stub; swap in a crate when ready.
-tts = []
+stt = ["dep:whisper-rs", "dep:hound", "dep:reqwest", "dep:dirs"]
+tts = ["dep:kokoros", "dep:hound", "dep:reqwest", "dep:dirs"]
 # Umbrella: all available engines.
 engines = ["llm", "stt", "tts"]
 # GPU backends — harmless no-ops unless the corresponding engine is also on.

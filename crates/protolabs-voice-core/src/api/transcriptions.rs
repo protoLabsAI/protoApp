@@ -4,8 +4,13 @@
 //! Returns `{"text": "..."}` on `json` (default) or the raw text when the
 //! client asks for `response_format=text`.
 //!
-//! Without the `stt` feature, we return a stub acknowledging the file size
+//! With the `stt` feature we hand the file bytes to whisper-rs (see
+//! `engines::stt`). Without it we return a stub acknowledging the file size
 //! so the frontend plumbing can be exercised end-to-end.
+//!
+//! The frontend's `useTranscription` hook sends 16 kHz mono PCM16 WAV so the
+//! server never touches an audio codec; clients that upload a different WAV
+//! sample-rate get naively resampled on the server.
 
 use std::sync::Arc;
 
@@ -87,6 +92,24 @@ pub async fn create(
         return (StatusCode::BAD_REQUEST, "missing `file` field").into_response();
     }
 
+    // Reject unknown transcription model ids fail-fast (mirrors the chat and
+    // speech endpoints) so a typo or a hallucinated id doesn't get a real
+    // Whisper result returned under a bogus label.
+    if !super::models::is_transcription_model(&model) {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": {
+                    "message": format!("transcription model `{model}` not found"),
+                    "type": "invalid_request_error",
+                    "param": "model",
+                    "code": "model_not_found",
+                }
+            })),
+        )
+            .into_response();
+    }
+
     // Validate response_format before doing any work so invalid requests
     // fail fast rather than getting a JSON body they didn't ask for.
     let fmt_response = match response_format.as_str() {
@@ -101,31 +124,77 @@ pub async fn create(
         }
     };
 
-    let text = transcribe(&audio_bytes, &model).await;
-
-    if fmt_response {
-        text.into_response()
-    } else {
-        Json(TranscriptionResponse { text }).into_response()
+    match transcribe(&audio_bytes, &model).await {
+        Ok(text) => {
+            if fmt_response {
+                text.into_response()
+            } else {
+                Json(TranscriptionResponse { text }).into_response()
+            }
+        }
+        Err(Failure::BadAudio(msg)) => {
+            // Client-side problem — log at debug because this isn't a bug
+            // in our side, and return 400 with an invalid_request_error so
+            // the OpenAI SDK raises a sensible exception class.
+            tracing::debug!(%msg, "rejecting malformed audio");
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("could not decode audio: {msg}"),
+                        "type": "invalid_request_error",
+                        "param": "file",
+                        "code": "bad_audio",
+                    }
+                })),
+            )
+                .into_response()
+        }
+        Err(Failure::Engine(msg)) => {
+            tracing::error!(%msg, "transcription engine failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": {
+                        "message": format!("transcription failed: {msg}"),
+                        "type": "server_error",
+                        "code": "transcription_failure",
+                    }
+                })),
+            )
+                .into_response()
+        }
     }
 }
 
+/// Always-compiled shape of what the inner transcribe helper returns, so
+/// the handler's `match` above doesn't need its own cfg arms. Under `stt`
+/// we map `engines::stt::TranscriptionFailure` into this; under the stub
+/// only `Ok` is ever produced.
+#[derive(Debug)]
+enum Failure {
+    BadAudio(String),
+    Engine(String),
+}
+
 #[cfg(not(feature = "stt"))]
-async fn transcribe(bytes: &[u8], model: &str) -> String {
-    format!(
+async fn transcribe(bytes: &[u8], model: &str) -> Result<String, Failure> {
+    Ok(format!(
         "[stub transcription — build with `--features stt` to enable whisper-rs; \
          needs cmake on the build host] received {} bytes for model {}",
         bytes.len(),
         model
-    )
+    ))
 }
 
 #[cfg(feature = "stt")]
-async fn transcribe(bytes: &[u8], _model: &str) -> String {
-    // TODO(step-1e): wire whisper-rs here once model-download helper lands.
-    // Placeholder keeps the endpoint contract stable in STT-enabled builds.
-    format!(
-        "[whisper-rs wiring pending — received {} bytes]",
-        bytes.len()
-    )
+async fn transcribe(bytes: &[u8], _model: &str) -> Result<String, Failure> {
+    use crate::engines::stt::TranscriptionFailure;
+    // Model-id validation happens in the outer handler, not here — by this
+    // point we've already confirmed the caller asked for an id we serve,
+    // which today maps to the single cached whisper model.
+    crate::engines::stt::transcribe(bytes).await.map_err(|e| match e {
+        TranscriptionFailure::BadAudio(s) => Failure::BadAudio(s),
+        TranscriptionFailure::Engine(s) => Failure::Engine(s),
+    })
 }

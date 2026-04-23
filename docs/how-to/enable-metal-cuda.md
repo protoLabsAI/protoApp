@@ -11,8 +11,13 @@ pnpm tauri dev -- --features llm,metal
 ```
 
 This turns on both `mistralrs/metal` (GPU kernels) and
-`mistralrs/accelerate` (Apple's BLAS). No Xcode command line tools
-beyond what Tauri already requires.
+`mistralrs/accelerate` (Apple's BLAS).
+
+Unlike the CPU path, the Metal backend in mistralrs needs the full
+**Xcode.app** (not just the Command Line Tools) because it compiles
+Metal shaders on the fly via `xcrun metal`. If you get
+`unable to find utility "metal"`, install Xcode from the App Store
+and run `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
 
 ## NVIDIA (CUDA)
 

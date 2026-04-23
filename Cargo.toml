@@ -31,8 +31,14 @@ url = "2"
 # Feature-gated engines — same pinning rules apply.
 mistralrs = "0.8"
 whisper-rs = { version = "0.16", default-features = false }
+hound = "3.5"
+dirs = "5"
+# Kokoro TTS — not published to crates.io; pinned to a specific commit so
+# reproducible builds don't float.
+kokoros = { git = "https://github.com/lucasjinreal/Kokoros.git", rev = "7089168f0ca2d8e1fcd8e523c9d75d915c6afdff", default-features = false }
 
-# Dev deps
+# reqwest — single declaration with the union of features needed by stt
+# (stream download) and our integration tests (json + multipart).
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "multipart"] }
 
 [profile.release]

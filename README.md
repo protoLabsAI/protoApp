@@ -16,8 +16,8 @@ vendor the same engine substrate and add a Python agent sidecar.
 | Streaming SSE chat UI | shipped |
 | Real Gemma 4 E2B chat behind `--features llm` | shipped |
 | Metal + CUDA feature flags | shipped |
-| Real whisper-rs STT | scaffolded; awaits [#10](./docs/explanation/engine-choices.md#stt-whisper-rs) |
-| Real Kokoro TTS | scaffolded; awaits [#11](./docs/explanation/engine-choices.md#tts-kokoro-82m-pending) |
+| Real whisper-rs STT | shipped behind `--features stt` (requires `brew install cmake` once) |
+| Real Kokoro TTS | shipped behind `--features tts` (via `kokoros` git dep) |
 | ORBIS Python sidecar plumbing | shipped as `orbis-sidecar`; awaits ORBIS WS entry point ([#12](./docs/how-to/integrate-orbis-sidecar.md)) |
 | React voice panels (mic / TTS playback) | shipped as Transcribe + Speak tabs; work against stubs today, pick up real engines automatically |
 
