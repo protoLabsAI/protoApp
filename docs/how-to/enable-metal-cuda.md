@@ -1,8 +1,8 @@
 # Enable Metal or CUDA
 
-The `llm` feature on its own builds mistralrs against the CPU backend,
-which is unusable for any model larger than a few hundred million
-params. Enable a GPU backend too.
+The `llm` feature on its own builds `llama-cpp-2` against the CPU
+backend, which works for 4B params (~2–5 tok/s on M-series) but is a
+lot slower than using the GPU. Enable a GPU backend too.
 
 ## Apple Silicon (Metal + Accelerate)
 
@@ -10,14 +10,12 @@ params. Enable a GPU backend too.
 pnpm tauri dev -- --features llm,metal
 ```
 
-This turns on both `mistralrs/metal` (GPU kernels) and
-`mistralrs/accelerate` (Apple's BLAS).
+This turns on both `llama-cpp-2/metal` (GPU kernels) and
+`whisper-rs/metal` (STT, if also enabled). Apple's Accelerate
+(first-class BLAS) is already bundled into llama.cpp's Metal backend.
 
-Unlike the CPU path, the Metal backend in mistralrs needs the full
-**Xcode.app** (not just the Command Line Tools) because it compiles
-Metal shaders on the fly via `xcrun metal`. If you get
-`unable to find utility "metal"`, install Xcode from the App Store
-and run `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+Command Line Tools (`xcode-select --install`) is sufficient — you do
+**not** need the full Xcode.app for llama.cpp's Metal path.
 
 ## NVIDIA (CUDA)
 
@@ -28,11 +26,9 @@ pnpm tauri dev -- --features llm,cuda
 Requires the CUDA toolkit to be installed — `nvcc --version` must work.
 On Linux, match your driver's CUDA version (usually 12.x).
 
-FlashAttention 2 kernels aren't exposed as a dedicated feature in this
-workspace; mistralrs enables them automatically when the CUDA backend
-detects a compatible GPU (Ampere or newer). If you need to force the
-FA2 path explicitly, do it with a mistralrs-level cargo flag override
-in your fork; there's no `flash-attn` feature to pass here today.
+llama.cpp auto-selects FlashAttention kernels when the GPU supports
+them (Ampere or newer). There's no dedicated `flash-attn` feature to
+flip here.
 
 ## Composing features
 
@@ -52,19 +48,21 @@ Run with `RUST_LOG=info`:
 RUST_LOG=info pnpm tauri dev -- --features llm,metal
 ```
 
-Look for mistralrs's own boot log line that reports the selected
-device. On Apple Silicon you want to see `metal`, not `cpu`.
+llama.cpp's boot log reports the selected device (e.g.
+`ggml_metal_init: GPU Family: MTLGPUFamilyApple8`) and the layer
+offload count. On Apple Silicon you should see a non-zero number of
+layers offloaded to Metal; on CPU-only builds, all layers stay on CPU.
 
 ## Why GPU features don't pull in engines
 
 The workspace uses `crate?/feature` optional-feature syntax:
 
 ```toml
-metal = ["mistralrs?/metal", "mistralrs?/accelerate", "whisper-rs?/metal"]
-cuda  = ["mistralrs?/cuda", "whisper-rs?/cuda"]
+metal = ["llama-cpp-2?/metal", "whisper-rs?/metal"]
+cuda  = ["llama-cpp-2?/cuda", "whisper-rs?/cuda"]
 ```
 
-The `?` means "enable the GPU feature on `mistralrs` **only if** some
-other feature already enabled `mistralrs`." So `--features metal`
-alone is a harmless no-op. This is what lets CI build multiple
-combinations without exploding the feature matrix.
+The `?` means "enable the GPU feature on `llama-cpp-2` **only if**
+some other feature already enabled `llama-cpp-2`." So
+`--features metal` alone is a harmless no-op. This is what lets CI
+build multiple combinations without exploding the feature matrix.

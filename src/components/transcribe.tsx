@@ -1,3 +1,4 @@
+import { EngineBanner } from "@/components/engine-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -43,6 +44,7 @@ export function Transcribe() {
       </CardHeader>
       <Separator />
       <CardContent className="pt-4 space-y-3">
+        <EngineBanner engine="stt" label="Whisper" />
         <div className="flex items-center gap-2">
           {primary}
           <Button type="button" variant="ghost" onClick={reset} disabled={phase === "recording" || phase === "transcribing"}>

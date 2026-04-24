@@ -4,9 +4,15 @@ A Tauri 2 desktop app that runs an **OpenAI-compatible local HTTP server
 inside its own Rust process**. The React frontend talks to it with the
 standard `openai` npm package — same SDK, different `baseURL`.
 
-Backed by in-process Rust inference (mistralrs + Gemma 4 E2B, whisper-rs,
-kokoros). Ships as a Cargo workspace so a second app, `orbis-tauri`, can
-vendor the same engine substrate and add a Python agent sidecar.
+Backed by in-process Rust inference (llama-cpp-2 + Qwen3-4B-Instruct-2507,
+whisper-rs, kokoros). Ships as a Cargo workspace so a second app,
+`orbis-tauri`, can vendor the same engine substrate and add a Python
+agent sidecar.
+
+> Gemma 4 was the original target but is currently blocked by an
+> upstream llama.cpp FGDN bug — see [STATUS.md](./STATUS.md) and
+> [HANDOFF.md](./HANDOFF.md) for the full story and the one-line swap
+> back.
 
 ## Status
 
@@ -14,12 +20,13 @@ vendor the same engine substrate and add a Python agent sidecar.
 |---|---|
 | OpenAI `/v1/*` surface (models, chat, transcriptions, speech, healthz) | shipped, 11/11 tests green |
 | Streaming SSE chat UI | shipped |
-| Real Gemma 4 E2B chat behind `--features llm` | shipped |
+| Real chat via Qwen3-4B-Instruct-2507 behind `--features llm` | shipped |
 | Metal + CUDA feature flags | shipped |
 | Real whisper-rs STT | shipped behind `--features stt` (requires `brew install cmake` once) |
 | Real Kokoro TTS | shipped behind `--features tts` (via `kokoros` git dep) |
 | ORBIS Python sidecar plumbing | shipped as `orbis-sidecar`; awaits ORBIS WS entry point ([#12](./docs/how-to/integrate-orbis-sidecar.md)) |
 | React voice panels (mic / TTS playback) | shipped as Transcribe + Speak tabs; work against stubs today, pick up real engines automatically |
+| Gemma 4 as default | ⏳ blocked on upstream llama.cpp ([STATUS.md](./STATUS.md)) |
 
 ## Quick start
 
@@ -28,17 +35,22 @@ pnpm install
 pnpm tauri dev
 ```
 
-Opens the chat UI against a streaming stub — proves the full transport
-without downloading any models. ~30 s cold compile.
+Starts with stub engines for fast iteration. Add `--features llm,metal`
+(or `,cuda`) to bring up the real LLM — see [Run a local LLM](./docs/tutorials/run-local-llm.md).
+With `--features engines,metal` you get the full stack: Qwen3-4B-Instruct-2507,
+Whisper, Kokoro TTS. First chat/transcribe/speak each trigger a
+one-time model download (~2.5 GB / ~60 MB / ~340 MB) cached under
+`~/.cache/protoapp/`.
 
-Real Gemma 4 on Apple Silicon:
+Without the `metal` feature, LLM inference runs on CPU at ~2–5 tok/s —
+noticeably slow. Build with GPU acceleration to get ~60 tok/s on
+M-series:
 
 ```sh
 pnpm tauri dev -- --features llm,metal
 ```
 
-First build is 10–15 min; first request downloads ~1.5 GB of weights.
-Both cached afterwards.
+(Apple Silicon. Use `llm,cuda` on NVIDIA.)
 
 See [docs/tutorials/getting-started.md](./docs/tutorials/getting-started.md)
 for the full walkthrough.
@@ -54,9 +66,9 @@ for the full walkthrough.
 │       ↓                                     │
 │  axum server ←— protolabs-voice-core        │
 │    │  /v1/models                            │
-│    │  /v1/chat/completions  ← mistralrs     │
+│    │  /v1/chat/completions  ← llama-cpp-2   │
 │    │  /v1/audio/transcriptions ← whisper-rs │
-│    │  /v1/audio/speech ← kokoros (pending)  │
+│    │  /v1/audio/speech ← kokoros            │
 │    │                                        │
 │    └── orbis-sidecar (spawn + WebSocket)    │
 └────────────────────┬────────────────────────┘
@@ -80,7 +92,7 @@ and [docs/explanation/architecture.md](./docs/explanation/architecture.md).
 
 Frontend: React 19 · Vite 7 · shadcn/ui · Zustand · TanStack Query · Biome
 
-Backend: Tauri 2 · tokio · axum 0.7 · mistralrs 0.8 · whisper-rs 0.16 · tokio-tungstenite 0.24
+Backend: Tauri 2 · tokio · axum 0.7 · llama-cpp-2 0.1.143 · whisper-rs 0.16 · kokoros · tokio-tungstenite 0.24
 
 Tooling: Cargo workspace · pnpm · tauri-specta (typed Tauri commands)
 
@@ -100,15 +112,20 @@ Tooling: Cargo workspace · pnpm · tauri-specta (typed Tauri commands)
 
 ```sh
 pnpm tauri dev                                    # run in dev mode (stub)
-pnpm tauri dev -- --features llm,metal            # ...with real Gemma 4 on Apple Silicon
+pnpm tauri dev -- --features llm,metal            # ...with real Qwen3-4B on Apple Silicon
 pnpm tauri build -- --features engines,metal      # release build, all engines
 cargo test --workspace                            # 11 tests across voice-core + sidecar
 pnpm typecheck                                    # TS
 pnpm lint                                         # Biome
 ```
 
+## Further reading
+
+- [STATUS.md](./STATUS.md) — what's shipped, what's blocked, and why.
+- [HANDOFF.md](./HANDOFF.md) — the three non-obvious things a new contributor needs to know.
+
 ## License
 
 MIT or Apache-2.0, at your option. Model weights carry their own
-licenses (Gemma under Google's Gemma Terms of Use, Whisper under MIT,
-Kokoro under Apache-2.0) — see the model cards.
+licenses (Qwen3 under Apache-2.0, Whisper under MIT, Kokoro under
+Apache-2.0) — see the model cards.

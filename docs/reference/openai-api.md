@@ -29,8 +29,7 @@ always returns WAV even when the client asks for mp3 (the advisory
 {
   "object": "list",
   "data": [
-    { "id": "gemma-4-e2b", "object": "model", "created": 0, "owned_by": "google" },
-    { "id": "gemma-4-e4b", "object": "model", "created": 0, "owned_by": "google" },
+    { "id": "qwen3-4b-instruct-2507", "object": "model", "created": 0, "owned_by": "qwen" },
     { "id": "whisper-large-v3-turbo", "object": "model", "created": 0, "owned_by": "openai" },
     { "id": "kokoro-82m", "object": "model", "created": 0, "owned_by": "hexgrad" }
   ]
@@ -43,7 +42,7 @@ always returns WAV even when the client asks for mp3 (the advisory
 
 ```json
 {
-  "model": "gemma-4-e2b",
+  "model": "qwen3-4b-instruct-2507",
   "messages": [
     { "role": "system", "content": "You are helpful." },
     { "role": "user",   "content": "hello" }
@@ -61,7 +60,7 @@ always returns WAV even when the client asks for mp3 (the advisory
   "id": "chatcmpl-<uuid>",
   "object": "chat.completion",
   "created": 1745355600,
-  "model": "gemma-4-e2b",
+  "model": "qwen3-4b-instruct-2507",
   "choices": [
     {
       "index": 0,
@@ -75,7 +74,7 @@ always returns WAV even when the client asks for mp3 (the advisory
 **Streaming response** (`stream: true`) — `text/event-stream`:
 
 ```
-data: {"id":"...","object":"chat.completion.chunk","created":...,"model":"gemma-4-e2b","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"...","object":"chat.completion.chunk","created":...,"model":"qwen3-4b-instruct-2507","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
 data: {"id":"...","object":"chat.completion.chunk",...,"choices":[{"index":0,"delta":{"content":"Hi "},"finish_reason":null}]}
 

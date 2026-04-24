@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EngineBanner } from "@/components/engine-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +21,7 @@ export function Speak() {
       </CardHeader>
       <Separator />
       <CardContent className="pt-4 space-y-3">
+        <EngineBanner engine="tts" label="Kokoro" />
         <label htmlFor="speak-input" className="sr-only">
           Text to speak
         </label>

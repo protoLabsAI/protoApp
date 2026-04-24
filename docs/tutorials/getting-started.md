@@ -5,7 +5,7 @@ streaming chat UI talking to an OpenAI-compatible server that's living
 inside the Tauri process.
 
 No model download is required — the default build uses a streaming stub
-so you can verify the whole stack works before committing to a 1.5 GB
+so you can verify the whole stack works before committing to a 2.5 GB
 model pull.
 
 ## 1. Prerequisites
@@ -47,10 +47,11 @@ and **Speak**.
 
 Type "hello" and press Send. You should see a streaming reply like:
 
-> \[stub reply — build with `--features llm` (optionally with `metal` on macOS or `cuda` on NVIDIA, e.g. `--features "llm metal"`) for real Gemma 4 inference\] You said: hello
+> \[stub reply — build with `--features llm` (optionally with `metal` on macOS or `cuda` on NVIDIA, e.g. `--features "llm metal"`) for real inference\] You said: hello
 
-The `llm` feature is the one that pulls in mistralrs; `metal` and `cuda`
-are GPU backends that only matter once `llm` is on.
+The `llm` feature is the one that pulls in `llama-cpp-2` and the
+default Qwen3-4B-Instruct-2507 model; `metal` and `cuda` are GPU
+backends that only matter once `llm` is on.
 
 That "stub reply" is the point of this tutorial — it proves:
 
@@ -89,6 +90,6 @@ You should see every test passing across `protolabs-voice-core` and
 
 ## Next
 
-- [Run Gemma 4 locally](./run-gemma-4-locally.md) — swap the stub for real inference.
+- [Run a local LLM](./run-local-llm.md) — swap the stub for real inference.
 - [OpenAI-compatible API reference](../reference/openai-api.md) — what endpoints exist.
 - [Architecture overview](../explanation/architecture.md) — how the pieces fit.

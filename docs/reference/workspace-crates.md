@@ -45,7 +45,7 @@ pub use api::state::AppState;
 
 Internal:
 - `api::{chat, models, speech, state, transcriptions}` — endpoint modules
-- `engines::llm` — mistralrs wrapper, feature-gated behind `llm`
+- `engines::llm` — llama-cpp-2 wrapper loading Qwen3-4B-Instruct-2507, feature-gated behind `llm`
 
 ## `orbis-sidecar` — `crates/orbis-sidecar/`
 

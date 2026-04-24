@@ -13,7 +13,7 @@
 //! / `metal` / `cuda` flag combinations.
 
 pub mod api;
-mod engines;
+pub mod engines;
 
 pub use api::{bind, bind_with_state, router};
 pub use api::state::AppState;

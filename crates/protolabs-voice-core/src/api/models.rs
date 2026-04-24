@@ -60,13 +60,8 @@ pub enum ModelKind {
 pub fn default_models() -> Vec<LocalModel> {
     vec![
         LocalModel {
-            id: "gemma-4-e2b",
-            owner: "google",
-            kind: ModelKind::Chat,
-        },
-        LocalModel {
-            id: "gemma-4-e4b",
-            owner: "google",
+            id: "qwen3-4b-instruct-2507",
+            owner: "qwen",
             kind: ModelKind::Chat,
         },
         LocalModel {

@@ -1,33 +1,32 @@
 # Swap the default LLM model
 
-The default is Gemma 4 E2B. Here's how to point the engine at a
-different GGUF without changing any code paths.
+The default is Qwen3-4B-Instruct-2507. Here's how to point the engine
+at a different GGUF without changing any code paths.
 
 ## 1. Pick a repo + file
 
-mistralrs accepts any GGUF on the Hugging Face hub. Confirmed working:
+`llama-cpp-2` accepts any GGUF on the Hugging Face hub that llama.cpp
+understands. Models known to work with our current pin
+(`llama-cpp-sys-2 = "=0.1.143"`):
 
 | Use case | Repo | File |
 |---|---|---|
+| **Default** | `unsloth/Qwen3-4B-Instruct-2507-GGUF` | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` |
 | Smaller / faster | `unsloth/SmolLM2-1.7B-Instruct-GGUF` | `SmolLM2-1.7B-Instruct-Q4_K_M.gguf` |
-| Gemma 4 E4B (bigger, smarter) | `unsloth/gemma-4-E4B-it-GGUF` | `gemma-4-E4B-it-Q4_K_M.gguf` |
-| Qwen 3 4B | `unsloth/Qwen3-4B-Instruct-2507-GGUF` | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` |
+| Larger / stronger | `unsloth/Qwen2.5-7B-Instruct-GGUF` | `Qwen2.5-7B-Instruct-Q4_K_M.gguf` |
+
+**Do NOT switch to a gated-delta-network model (Gemma 4, Qwen3.5)**
+until upstream llama.cpp fixes the FGDN tensor-name assert — the
+process will abort on first inference. See
+[STATUS.md](../../STATUS.md#gemma-4-blocked-by-llamacpp-fgdn-tensor-name-assert).
 
 ## 2. Edit the loader
 
 `crates/protolabs-voice-core/src/engines/llm.rs`:
 
 ```rust
-pub async fn load_default() -> Result<Model> {
-    let model = GgufModelBuilder::new(
-        "unsloth/gemma-4-E2B-it-GGUF",                 // ← repo
-        vec!["gemma-4-E2B-it-Q4_K_M.gguf"],            // ← file
-    )
-    .with_logging()
-    .build()
-    .await?;
-    Ok(model)
-}
+const DEFAULT_MODEL_REPO: &str = "unsloth/Qwen3-4B-Instruct-2507-GGUF";
+const DEFAULT_MODEL_FILE: &str = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf";
 ```
 
 Change the repo and filename. That's it.
@@ -39,14 +38,15 @@ Change the repo and filename. That's it.
 ```rust
 pub fn default_models() -> Vec<LocalModel> {
     vec![
-        LocalModel { id: "gemma-4-e2b", owner: "google", kind: ModelKind::Chat },
+        LocalModel { id: "qwen3-4b-instruct-2507", owner: "qwen", kind: ModelKind::Chat },
         // ...
     ]
 }
 ```
 
 This is what `GET /v1/models` returns. Make the id match what the
-frontend sends in `ChatRequest.model` so the picker UI doesn't desync.
+frontend sends in `ChatRequest.model` (`src/hooks/use-chat.ts`) so the
+picker UI doesn't desync.
 
 ## 4. Rebuild
 
@@ -63,11 +63,12 @@ cargo build -p protoapp --features llm,cuda --release
 cargo build -p protoapp --features llm --release
 ```
 
-mistralrs caches weights per-repo, so swapping downloads the new GGUF
-but keeps the old one — safe to bounce back and forth for A/B.
+Our GGUF cache lives at `~/.cache/protoapp/llm/` — swapping downloads
+the new model but keeps the old one, so you can A/B by flipping the
+constant and rebuilding.
 
 ## Caveats
 
-- **License**: Gemma's weights are under Google's Gemma Terms of Use (not Apache). If you redistribute a bundled binary, download on first run rather than shipping the weights in the installer.
-- **VRAM**: E4B at Q4_K_M needs ~4 GB; check before switching on low-end machines.
-- **Tokenizer**: for non-unsloth GGUFs, some have a buggy chat template. Unsloth's repos have historically been the fastest to ship a clean template.
+- **License**: check the model card. Qwen3 is Apache-2.0 (redistributable). Gemma models are under Google's Gemma Terms of Use.
+- **VRAM / RAM**: at Q4_K_M, 4B params is ~3 GB, 7B is ~5 GB. Check before switching on low-end machines.
+- **Tokenizer / chat template**: llama.cpp parses the embedded chat template out of the GGUF. Unsloth's repos have historically been the cleanest; if a model outputs garbled prompts, try a different quantizer.

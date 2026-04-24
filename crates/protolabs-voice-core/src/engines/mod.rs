@@ -9,6 +9,8 @@
 //! the plumbing is always exercisable end-to-end without the 10+ minute cold
 //! compile of real engines.
 
+pub mod events;
+
 #[cfg(feature = "llm")]
 pub mod llm;
 

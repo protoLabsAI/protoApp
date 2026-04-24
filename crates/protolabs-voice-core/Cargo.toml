@@ -23,7 +23,10 @@ serde_json.workspace = true
 url.workspace = true
 
 # Feature-gated engines
-mistralrs = { workspace = true, optional = true }
+llama-cpp-2 = { workspace = true, optional = true }
+llama-cpp-sys-2 = { workspace = true, optional = true }
+hf-hub = { workspace = true, optional = true }
+encoding_rs = { workspace = true, optional = true }
 whisper-rs = { workspace = true, optional = true }
 # Kokoro TTS via the lucasjinreal/Kokoros git dep. Publishes no crates.io
 # artifact, so we pin via workspace git reference.
@@ -40,14 +43,14 @@ dirs = { workspace = true, optional = true }
 [features]
 default = []
 # Individual engines — compose them as needed.
-llm = ["dep:mistralrs"]
+llm = ["dep:llama-cpp-2", "dep:llama-cpp-sys-2", "dep:hf-hub", "dep:encoding_rs", "dep:reqwest", "dep:dirs"]
 stt = ["dep:whisper-rs", "dep:hound", "dep:reqwest", "dep:dirs"]
 tts = ["dep:kokoros", "dep:hound", "dep:reqwest", "dep:dirs"]
 # Umbrella: all available engines.
 engines = ["llm", "stt", "tts"]
 # GPU backends — harmless no-ops unless the corresponding engine is also on.
-metal = ["mistralrs?/metal", "mistralrs?/accelerate", "whisper-rs?/metal"]
-cuda = ["mistralrs?/cuda", "whisper-rs?/cuda"]
+metal = ["llama-cpp-2?/metal", "whisper-rs?/metal"]
+cuda = ["llama-cpp-2?/cuda", "whisper-rs?/cuda"]
 
 [dev-dependencies]
 reqwest.workspace = true

@@ -3,33 +3,57 @@
 The LLM/STT/TTS landscape in April 2026 is crowded. Here's the
 reasoning behind each pick and the serious alternatives we evaluated.
 
-## LLM: Gemma 4 E2B via mistralrs
+## LLM: Qwen3-4B-Instruct-2507 via llama-cpp-2
 
-**Picked**: Google's [Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it),
+**Picked**: [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507),
 quantized GGUF Q4_K_M from
-[unsloth/gemma-4-E2B-it-GGUF](https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF),
-run via [mistralrs](https://github.com/EricLBuehler/mistral.rs) 0.8.
+[unsloth/Qwen3-4B-Instruct-2507-GGUF](https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF),
+run via [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) 0.1.143
+(Rust bindings to llama.cpp).
 
 **Why this model**
 
-- Released 2026-04-02; 3 weeks old at time of writing.
-- The model is natively trained for function calling. **Wiring status**: our streaming handler in `crates/protolabs-voice-core/src/engines/llm.rs` currently forwards only `delta.content`; `tool_calls` deltas are **not yet** surfaced on `/v1/chat/completions`. The capability is there at the model level, but our pipeline is still pending — tracked in the README roadmap.
-- Vision + audio input (we don't use audio input in v1 — whisper-rs is faster and more predictable).
-- MatFormer architecture: "E2B" means ~2 B **effective** params from a deeper base, so the runtime footprint is ~2 GB at Q4_K_M — installable on a user's laptop.
+- Apache-2.0 license; redistributable without special terms.
+- Classic attention transformer — no gated-delta tensors, so it doesn't trip llama.cpp's FGDN assertion (which blocks Gemma 4 and Qwen3.5, see below).
+- ~2.5 GB at Q4_K_M, ~3 GB VRAM at runtime; comfortable on a modern laptop.
+- Tool-use trained; the streaming handler in `engines/llm.rs` currently forwards only `delta.content` (tracked as a follow-up to surface `tool_calls` deltas).
 
-**Why mistralrs specifically**
+**Why llama-cpp-2 specifically**
 
-- Ships an OpenAI-compatible API surface (`/v1/chat/completions`, `/v1/audio/transcriptions`, `/v1/audio/speech`, `/v1/embeddings`, `/v1/images/generations`) as both a standalone binary *and* an embeddable Rust library.
-- Metal + CUDA + CPU with FlashAttention 2/3 and PagedAttention.
-- Model format-agnostic: HuggingFace safetensors, GGUF, UQFF.
-- MCP client built in (useful when we layer agent capabilities on top).
-- Active, solo-maintained by Eric Buehler; release cadence has been weekly.
+- Thin Rust binding around llama.cpp's mature C++ core — fast CPU inference via tight SIMD/BLAS, first-class Metal on Apple Silicon, CUDA on NVIDIA.
+- Small dep tree compared to other Rust LLM stacks — cold compile is a few minutes instead of 10–15.
+- We own the HTTP surface ourselves (axum in `protolabs-voice-core`), which is fine: the OpenAI-compat endpoints are a few hundred lines of handlers.
+
+### Why not Gemma 4 (what we originally wanted)
+
+Gemma 4 E2B/E4B was the plan: function calling, vision input,
+MatFormer's small runtime footprint. Two successive blockers killed it
+for v1:
+
+**mistralrs path (tried first)** — three separate Gemma 4 bugs:
+1. Missing GGUF arch enum for `gemma4` — upstream [#2098](https://github.com/EricLBuehler/mistral.rs/issues/2098).
+2. `Gemma4ForConditionalGeneration` rejected by `TextModelBuilder` because it's not a CausalLM class.
+3. serde duplicate-field error on `expert_intermediate_size` via `ModelBuilder` — upstream [#2119](https://github.com/EricLBuehler/mistral.rs/issues/2119), filed by us. No fix on master either.
+
+**llama-cpp-2 path (pivoted to)** — llama.cpp's Fused Gated Delta
+Network code asserts on Gemma 4's tensor naming:
+```
+GGML_ASSERT(strncmp(n->name, LLAMA_TENSOR_NAME_FGDN_AR "-", prefix_len) == 0) failed
+```
+(src/llama-context.cpp:485 on 0.1.143, line 487 on 0.1.145.) Weights
+load successfully — first inference aborts. Qwen3.5-4B trips the same
+assert because it also uses gated delta networks.
+
+The full repro log, attempts, and unblock criteria live in
+[STATUS.md](../../STATUS.md#gemma-4-blocked-by-llamacpp-fgdn-tensor-name-assert).
+When upstream llama.cpp accepts Gemma 4's tensor names, the swap back
+is a one-liner in `engines/llm.rs`.
 
 **Alternatives we evaluated**
 
 | Alternative | Why we didn't pick it |
 |---|---|
-| `llama-cpp-2` (utilityai/llama_cpp-rs) | Fastest build times, smallest dep surface, but no built-in OpenAI shape — we'd be hand-rolling an Axum layer that mistralrs gives us for free. |
+| `mistralrs` 0.8 | Had three Gemma 4 bugs (see above); fine for other models but we wanted Gemma 4 as the default. |
 | `candle` | Great Rust ML primitives but LLM-level conveniences (tokenizers, chat templates, server) are not first-class. |
 | Pure in-browser (WebLLM) | See [architecture](./architecture.md). Rejected on perf + UX grounds. |
 | Moshi (kyutai-labs) | Different paradigm — full-duplex speech-to-speech foundation model. Great for a "casual mode" demo. Doesn't support function calling; not a drop-in. Reserved for a future parallel path. |

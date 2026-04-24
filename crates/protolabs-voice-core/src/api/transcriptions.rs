@@ -28,7 +28,7 @@ pub struct TranscriptionResponse {
 }
 
 pub async fn create(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     mut form: Multipart,
 ) -> Response {
     let mut audio_bytes: Vec<u8> = Vec::new();
@@ -124,7 +124,7 @@ pub async fn create(
         }
     };
 
-    match transcribe(&audio_bytes, &model).await {
+    match transcribe(&audio_bytes, &model, &state).await {
         Ok(text) => {
             if fmt_response {
                 text.into_response()
@@ -170,15 +170,17 @@ pub async fn create(
 /// Always-compiled shape of what the inner transcribe helper returns, so
 /// the handler's `match` above doesn't need its own cfg arms. Under `stt`
 /// we map `engines::stt::TranscriptionFailure` into this; under the stub
-/// only `Ok` is ever produced.
+/// only `Ok` is ever produced — so the variants look dead when the `stt`
+/// feature is off, but the handler still needs the match arms compiled.
 #[derive(Debug)]
+#[cfg_attr(not(feature = "stt"), allow(dead_code))]
 enum Failure {
     BadAudio(String),
     Engine(String),
 }
 
 #[cfg(not(feature = "stt"))]
-async fn transcribe(bytes: &[u8], model: &str) -> Result<String, Failure> {
+async fn transcribe(bytes: &[u8], model: &str, _state: &AppState) -> Result<String, Failure> {
     Ok(format!(
         "[stub transcription — build with `--features stt` to enable whisper-rs; \
          needs cmake on the build host] received {} bytes for model {}",
@@ -188,13 +190,15 @@ async fn transcribe(bytes: &[u8], model: &str) -> Result<String, Failure> {
 }
 
 #[cfg(feature = "stt")]
-async fn transcribe(bytes: &[u8], _model: &str) -> Result<String, Failure> {
+async fn transcribe(bytes: &[u8], _model: &str, state: &AppState) -> Result<String, Failure> {
     use crate::engines::stt::TranscriptionFailure;
     // Model-id validation happens in the outer handler, not here — by this
     // point we've already confirmed the caller asked for an id we serve,
     // which today maps to the single cached whisper model.
-    crate::engines::stt::transcribe(bytes).await.map_err(|e| match e {
-        TranscriptionFailure::BadAudio(s) => Failure::BadAudio(s),
-        TranscriptionFailure::Engine(s) => Failure::Engine(s),
-    })
+    crate::engines::stt::transcribe(bytes, &state.emitter)
+        .await
+        .map_err(|e| match e {
+            TranscriptionFailure::BadAudio(s) => Failure::BadAudio(s),
+            TranscriptionFailure::Engine(s) => Failure::Engine(s),
+        })
 }

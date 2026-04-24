@@ -5,13 +5,12 @@
 protoApp is a Tauri desktop app where **the Rust host process runs a
 local OpenAI-compatible HTTP server**, and the React frontend talks to
 that server using the standard `openai` npm package — same SDK,
-different `baseURL`. The LLM path is backed by mistralrs in-process
-today (feature-gated behind `--features llm`). STT and TTS are
-scaffolded with identical endpoint shapes — whisper-rs (STT) and
-Kokoro (TTS) are the intended engines, wired in once their upstream
-crates are buildable; see
+different `baseURL`. The LLM path is backed by `llama-cpp-2`
+in-process (feature-gated behind `--features llm`), serving
+Qwen3-4B-Instruct-2507 as the default model. STT (whisper-rs) and TTS
+(kokoros) are wired up behind their own feature flags. See
 [`docs/explanation/engine-choices.md`](./engine-choices.md) for the
-status of each. A second workspace crate, `orbis-sidecar`, provides
+rationale on each. A second workspace crate, `orbis-sidecar`, provides
 the plumbing for a Python agent process to hang off this system for
 higher-order reasoning without ever touching the audio hot path.
 
@@ -56,10 +55,11 @@ for the concrete layout. The important property is:
 
 ## Feature flags as a complexity throttle
 
-Compiling mistralrs cold takes 10–15 minutes. That's poisonous to the
-"clone and contribute" experience for anyone not working on inference.
-So the default build is stub-only — 25 s compile, still useful because
-the streaming stub proves every layer of transport works end-to-end.
+Compiling the full engine stack cold (llama-cpp-2's vendored C++, the
+kokoros git dep with its ONNX runtime, whisper.cpp) takes a few
+minutes. That's not free for anyone not working on inference. So the
+default build is stub-only — 25 s compile, still useful because the
+streaming stub proves every layer of transport works end-to-end.
 
 You pay for what you opt into: `--features llm`, `--features stt`,
 `--features tts`, combined with `--features metal` or `--features cuda`
@@ -75,5 +75,5 @@ matrix composable (details in
 
 ## Further reading
 
-- [Engine choices](./engine-choices.md) — *why* mistralrs + whisper-rs + Kokoro, specifically.
+- [Engine choices](./engine-choices.md) — *why* llama-cpp-2 + whisper-rs + Kokoro, specifically.
 - [Voice hot path vs agent brain](./voice-hotpath-vs-agent-brain.md) — *why* ORBIS stays Python instead of getting rewritten in Rust.

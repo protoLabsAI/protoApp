@@ -29,7 +29,10 @@ async fn models_endpoint_returns_defaults() {
         .iter()
         .filter_map(|m| m["id"].as_str())
         .collect();
-    assert!(ids.contains(&"gemma-4-e2b"), "missing gemma-4-e2b in {ids:?}");
+    assert!(
+        ids.contains(&"qwen3-4b-instruct-2507"),
+        "missing qwen3-4b-instruct-2507 in {ids:?}"
+    );
 }
 
 #[tokio::test]
@@ -41,7 +44,7 @@ async fn chat_completions_streams_sse_and_terminates() {
     let resp = client
         .post(format!("http://{addr}/v1/chat/completions"))
         .json(&json!({
-            "model": "gemma-4-e2b",
+            "model": "qwen3-4b-instruct-2507",
             "messages": [{"role": "user", "content": "hello"}],
             "stream": true
         }))
@@ -175,7 +178,7 @@ async fn chat_completions_json_mode_returns_body() {
     let body: serde_json::Value = client
         .post(format!("http://{addr}/v1/chat/completions"))
         .json(&json!({
-            "model": "gemma-4-e2b",
+            "model": "qwen3-4b-instruct-2507",
             "messages": [{"role": "user", "content": "ping"}]
         }))
         .send()
@@ -186,7 +189,7 @@ async fn chat_completions_json_mode_returns_body() {
         .expect("json");
 
     assert_eq!(body["object"], "chat.completion");
-    assert_eq!(body["model"], "gemma-4-e2b");
+    assert_eq!(body["model"], "qwen3-4b-instruct-2507");
     let content = body["choices"][0]["message"]["content"]
         .as_str()
         .expect("content");

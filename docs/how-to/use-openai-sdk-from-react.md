@@ -23,7 +23,7 @@ function Example() {
 
   async function ask() {
     const stream = await client.chat.completions.create({
-      model: "gemma-4-e2b",
+      model: "qwen3-4b-instruct-2507",
       messages: [{ role: "user", content: "hello" }],
       stream: true,
     });
@@ -49,7 +49,7 @@ import { useChat } from "@/hooks/use-chat";
 
 function MyChat() {
   const { messages, send, isStreaming, stop } = useChat({
-    model: "gemma-4-e2b",
+    // model defaults to "qwen3-4b-instruct-2507" — pass explicitly to override
     systemPrompt: "Be concise.",
   });
   return (/* render messages, onSubmit → send(input) */);

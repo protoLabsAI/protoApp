@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { EngineBanner } from "@/components/engine-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,11 +36,12 @@ export function Chat() {
       <CardHeader>
         <CardTitle>Local chat</CardTitle>
         <CardDescription>
-          Talking to the in-process OpenAI-compatible server (model: gemma-4-e2b)
+          Talking to the in-process OpenAI-compatible server (model: qwen3-4b-instruct-2507)
         </CardDescription>
       </CardHeader>
       <Separator />
       <CardContent className="pt-4 space-y-3">
+        <EngineBanner engine="llm" label="Qwen3-4B-Instruct-2507" />
         <div
           ref={scrollRef}
           role="log"

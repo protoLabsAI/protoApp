@@ -36,7 +36,7 @@ pub struct SpeechRequest {
 }
 
 pub async fn create(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<SpeechRequest>,
 ) -> Response {
     // --- Validate everything before we do any work -----------------------
@@ -76,7 +76,7 @@ pub async fn create(
     // --- Work ------------------------------------------------------------
 
     let voice = req.voice.as_deref().unwrap_or("af_heart");
-    let audio = synthesize(&req.input, voice).await;
+    let audio = synthesize(&req.input, voice, &state).await;
 
     let mut headers = HeaderMap::new();
     // Always WAV on the wire today; mp3 transcoding is a TODO. We surface
@@ -93,15 +93,15 @@ pub async fn create(
 }
 
 #[cfg(not(feature = "tts"))]
-async fn synthesize(_input: &str, _voice: &str) -> Vec<u8> {
+async fn synthesize(_input: &str, _voice: &str, _state: &AppState) -> Vec<u8> {
     // 1 second of silence at 24 kHz mono f32 — enough for the UI to detect
     // "something came back" without a real TTS engine loaded.
     silence_wav_24khz(1.0)
 }
 
 #[cfg(feature = "tts")]
-async fn synthesize(input: &str, voice: &str) -> Vec<u8> {
-    match crate::engines::tts::synthesize_wav(input, voice).await {
+async fn synthesize(input: &str, voice: &str, state: &AppState) -> Vec<u8> {
+    match crate::engines::tts::synthesize_wav(input, voice, &state.emitter).await {
         Ok(bytes) => bytes,
         Err(e) => {
             tracing::error!(?e, "kokoros synthesis failed; falling back to silence");

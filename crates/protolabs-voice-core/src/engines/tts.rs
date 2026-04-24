@@ -10,10 +10,13 @@
 
 use std::io::Cursor;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail};
 use kokoros::tts::koko::TTSKoko;
 use tokio::sync::OnceCell;
+
+use crate::engines::events::{Engine, StatusEmitter, emit_error, emit_loading, emit_ready};
 
 pub const OUTPUT_SAMPLE_RATE: u32 = 24_000;
 
@@ -41,24 +44,39 @@ fn voices_path() -> Result<String> {
     Ok(cache_dir()?.join("voices-v1.0.bin").to_string_lossy().into_owned())
 }
 
-async fn engine() -> Result<&'static TTSKoko> {
+async fn engine(emitter: &Arc<dyn StatusEmitter>) -> Result<&'static TTSKoko> {
     ENGINE
         .get_or_try_init(|| async {
             tracing::info!("loading Kokoro TTS (first run downloads ~340 MB)");
+            // Kokoros handles the model + voice-pack download inside
+            // TTSKoko::new — no byte-level hooks exposed — so we publish a
+            // coarse `loading` event and let the host surface a spinner.
+            emit_loading(emitter, Engine::Tts);
             let model = model_path()?;
             let voices = voices_path()?;
             // TTSKoko::new downloads the files on first use via the kokoros
             // InitConfig defaults. That's the cache-warm cost we pay once.
             let engine = TTSKoko::new(&model, &voices).await;
             tracing::info!("Kokoro TTS ready");
+            emit_ready(emitter, Engine::Tts);
             anyhow::Ok(engine)
         })
         .await
 }
 
 /// Synthesize `input` in `voice`. Returns 24 kHz mono WAV bytes.
-pub async fn synthesize_wav(input: &str, voice: &str) -> Result<Vec<u8>> {
-    let engine = engine().await?;
+pub async fn synthesize_wav(
+    input: &str,
+    voice: &str,
+    emitter: &Arc<dyn StatusEmitter>,
+) -> Result<Vec<u8>> {
+    let engine = match engine(emitter).await {
+        Ok(e) => e,
+        Err(err) => {
+            emit_error(emitter, Engine::Tts, format!("{err:#}"));
+            return Err(err);
+        }
+    };
     let voice = voice.to_string();
     let input = input.to_string();
 
@@ -70,7 +88,11 @@ pub async fn synthesize_wav(input: &str, voice: &str) -> Result<Vec<u8>> {
             .map_err(|e| anyhow!("kokoros tts_raw_audio failed: {e}"))
     })
     .await
-    .context("join kokoros worker")??;
+    .context("join kokoros worker")
+    .map_err(|e| {
+        emit_error(emitter, Engine::Tts, format!("{e:#}"));
+        e
+    })??;
 
     if samples.is_empty() {
         bail!("kokoros returned no samples (empty synthesis)");

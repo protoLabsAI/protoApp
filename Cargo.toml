@@ -29,7 +29,30 @@ tokio-tungstenite = { version = "0.24", default-features = false, features = ["c
 url = "2"
 
 # Feature-gated engines — same pinning rules apply.
-mistralrs = "0.8"
+#
+# llama-cpp-2: Rust bindings to llama.cpp. Picked over mistralrs after
+# mistralrs hit three Gemma 4 bugs (missing GGUF arch — upstream #2098;
+# `Gemma4ForConditionalGeneration` rejected by TextModelBuilder; serde
+# duplicate-field on `expert_intermediate_size` via ModelBuilder —
+# upstream #2119).
+#
+# Gemma 4 is still blocked here too: llama.cpp's Fused Gated Delta
+# Network path asserts on Gemma 4's tensor naming —
+# `GGML_ASSERT(strncmp(n->name, LLAMA_TENSOR_NAME_FGDN_AR "-", ...))`
+# at src/llama-context.cpp:487 (on both 0.1.143 and 0.1.145). Qwen3.5
+# trips the same assert since it also uses gated delta networks. Our
+# working default is Qwen3-4B-Instruct-2507 — a classic transformer
+# that never exercises the FGDN path. Pinned to 0.1.143 because that
+# combo is verified end-to-end (streamed tokens 2026-04-23); revisit
+# once upstream llama.cpp accepts Gemma 4's tensor names.
+llama-cpp-2 = "=0.1.143"
+# Same pin — the sys crate's constants and type layouts must match.
+llama-cpp-sys-2 = "=0.1.143"
+# Small helper for resolving HF hub repo URLs when we build our own
+# streaming downloader (we want the tick-progress events; hf-hub's
+# blocking client doesn't cooperate with our emitter loop).
+hf-hub = { version = "0.4", default-features = false, features = ["rustls-tls"] }
+encoding_rs = "0.8"
 whisper-rs = { version = "0.16", default-features = false }
 hound = "3.5"
 dirs = "5"

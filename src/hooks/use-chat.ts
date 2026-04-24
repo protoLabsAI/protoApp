@@ -12,7 +12,7 @@ export interface UseChatOptions {
 }
 
 export function useChat({
-  model = "gemma-4-e2b",
+  model = "qwen3-4b-instruct-2507",
   systemPrompt = "You are a helpful assistant running entirely locally.",
 }: UseChatOptions = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

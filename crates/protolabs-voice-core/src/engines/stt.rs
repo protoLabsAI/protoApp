@@ -11,11 +11,16 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
 use tokio::sync::OnceCell;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+use crate::engines::events::{
+    Engine, StatusEmitter, emit_downloading, emit_error, emit_loading, emit_ready,
+};
 
 const DEFAULT_MODEL_REPO: &str = "ggerganov/whisper.cpp";
 const DEFAULT_MODEL_FILE: &str = "ggml-base.en-q5_1.bin";
@@ -39,7 +44,7 @@ static CTX: OnceCell<WhisperContext> = OnceCell::const_new();
 
 /// Locate the cached model file, downloading it from Hugging Face on
 /// first use.
-pub async fn ensure_model() -> Result<PathBuf> {
+pub async fn ensure_model(emitter: &Arc<dyn StatusEmitter>) -> Result<PathBuf> {
     if let Ok(override_path) = std::env::var("PROTOAPP_WHISPER_MODEL_PATH") {
         let p = PathBuf::from(override_path);
         if p.exists() {
@@ -72,7 +77,7 @@ pub async fn ensure_model() -> Result<PathBuf> {
         std::process::id(),
         uuid::Uuid::new_v4().simple()
     ));
-    download_streaming(DEFAULT_MODEL_URL, &tmp).await?;
+    download_streaming(DEFAULT_MODEL_URL, &tmp, emitter).await?;
     // If a racing process finished before us, keep their copy and discard ours.
     if path.exists() {
         let _ = tokio::fs::remove_file(&tmp).await;
@@ -84,7 +89,11 @@ pub async fn ensure_model() -> Result<PathBuf> {
     Ok(path)
 }
 
-async fn download_streaming(url: &str, dst: &Path) -> Result<()> {
+async fn download_streaming(
+    url: &str,
+    dst: &Path,
+    emitter: &Arc<dyn StatusEmitter>,
+) -> Result<()> {
     use futures::StreamExt;
     use tokio::io::AsyncWriteExt;
 
@@ -102,21 +111,26 @@ async fn download_streaming(url: &str, dst: &Path) -> Result<()> {
     let mut file = tokio::fs::File::create(dst).await?;
     let mut stream = resp.bytes_stream();
     let mut bytes_written: u64 = 0;
-    let mut last_log = std::time::Instant::now();
+    let mut last_tick = std::time::Instant::now();
+    // Initial "0 / total" event so the UI can switch to the progress bar the
+    // moment the download starts, without waiting for the first tick.
+    emit_downloading(emitter, Engine::Stt, 0, total);
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("read chunk")?;
         file.write_all(&chunk).await?;
         bytes_written += chunk.len() as u64;
-        if last_log.elapsed() > Duration::from_secs(5) {
+        // Tick at ~2 Hz so the UI stays smooth without spamming IPC. Each
+        // emit is a serde_json::to_string + IPC frame so we don't want to
+        // fire on every chunk (chunks are ~16 KB).
+        if last_tick.elapsed() > Duration::from_millis(500) {
+            emit_downloading(emitter, Engine::Stt, bytes_written, total);
             if let Some(total) = total {
                 tracing::info!(
                     percent = (bytes_written * 100 / total.max(1)),
                     "whisper model download progress"
                 );
-            } else {
-                tracing::info!(bytes = bytes_written, "whisper model download progress");
             }
-            last_log = std::time::Instant::now();
+            last_tick = std::time::Instant::now();
         }
     }
     file.flush().await?;
@@ -124,14 +138,15 @@ async fn download_streaming(url: &str, dst: &Path) -> Result<()> {
 }
 
 /// Lazily build and return the shared whisper context.
-async fn context() -> Result<&'static WhisperContext> {
+async fn context(emitter: &Arc<dyn StatusEmitter>) -> Result<&'static WhisperContext> {
     CTX.get_or_try_init(|| async {
-        let model_path = ensure_model().await?;
+        let model_path = ensure_model(emitter).await?;
         tracing::info!(
             repo = DEFAULT_MODEL_REPO,
             file = DEFAULT_MODEL_FILE,
             "loading whisper model"
         );
+        emit_loading(emitter, Engine::Stt);
         let ctx = WhisperContext::new_with_params(
             model_path
                 .to_str()
@@ -139,6 +154,7 @@ async fn context() -> Result<&'static WhisperContext> {
             WhisperContextParameters::default(),
         )
         .context("WhisperContext::new_with_params")?;
+        emit_ready(emitter, Engine::Stt);
         anyhow::Ok(ctx)
     })
     .await
@@ -171,7 +187,10 @@ impl std::error::Error for TranscriptionFailure {}
 /// of a `POST /v1/audio/transcriptions` request. The frontend's
 /// `useTranscription` hook guarantees 16 kHz mono PCM16 WAV; older clients
 /// that send a different WAV format are converted on the fly.
-pub async fn transcribe(wav_bytes: &[u8]) -> std::result::Result<String, TranscriptionFailure> {
+pub async fn transcribe(
+    wav_bytes: &[u8],
+    emitter: &Arc<dyn StatusEmitter>,
+) -> std::result::Result<String, TranscriptionFailure> {
     let (samples, source_rate, source_channels) = read_wav_to_f32_mono(wav_bytes)
         .context("decode incoming WAV")
         .map_err(|e| TranscriptionFailure::BadAudio(format!("{e:#}")))?;
@@ -191,9 +210,11 @@ pub async fn transcribe(wav_bytes: &[u8]) -> std::result::Result<String, Transcr
         "running whisper"
     );
 
-    let ctx = context()
-        .await
-        .map_err(|e| TranscriptionFailure::Engine(format!("{e:#}")))?;
+    let ctx = context(emitter).await.map_err(|e| {
+        let msg = format!("{e:#}");
+        emit_error(emitter, Engine::Stt, &msg);
+        TranscriptionFailure::Engine(msg)
+    })?;
     // Whisper calls into CPU/GPU-bound C++ that holds its own locks; keep it
     // off the tokio pool so async tasks don't starve.
     let text = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
