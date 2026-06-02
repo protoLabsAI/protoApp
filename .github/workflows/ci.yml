@@ -15,7 +15,7 @@ permissions:
 jobs:
   frontend:
     name: frontend (typecheck + lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # workspace-config: allow-hosted-runner bootstrap gate; owned-runner + full Rust/iOS CI is iPad-pivot milestone M2
     steps:
       - uses: actions/checkout@v4
 

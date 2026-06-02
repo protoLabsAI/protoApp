@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "workflow": {
+    "gitWorkflow": {
+      "prBaseBranch": "main"
+    }
+  },
+  "worktreePanelVisible": false
+}

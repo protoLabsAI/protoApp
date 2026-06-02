@@ -1,0 +1,17 @@
+# Fleet workflow security lint — calls the canonical reusable workflow in
+# protoLabsAI/release-tools (zizmor + actionlint). Versions are centralized
+# there; this caller stays tiny. `verify-workspace-config` requires this file.
+name: Workflow Security Lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-lint:
+    uses: protoLabsAI/release-tools/.github/workflows/workflow-security-lint.yml@main
