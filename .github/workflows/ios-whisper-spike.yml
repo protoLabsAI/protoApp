@@ -57,8 +57,11 @@ jobs:
           EOF
           cat > /tmp/ios-whisper-spike/src/main.rs <<'EOF'
           fn main() {
+              // Verify the whisper-rs crate links for the iOS target.
+              // `get_whisper_version()` is a runtime function that requires
+              // a successful link against the whisper.cpp staticlib.
               println!("whisper-rs linked successfully for iOS target");
-              println!("Metal support: {}", whisper_rs::whisper_library_exists());
+              println!("Version: {}", whisper_rs::get_whisper_version());
           }
           EOF
 

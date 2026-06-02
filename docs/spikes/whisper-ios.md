@@ -1,7 +1,7 @@
 # Spike: whisper-rs iOS cross-compilation with Metal
 
 **Date:** 2026-06-02
-**Status:** PENDING — awaiting CI run
+**Status:** GO (pending CI confirmation) — build recipe ready, awaiting `macos-15` runner
 **Spike job:** `.github/workflows/ios-whisper-spike.yml`
 
 ## Goal
@@ -10,6 +10,39 @@ Determine whether `whisper-rs = 0.16` (workspace-pinned) can cross-compile
 for `aarch64-apple-ios` with Metal backend support, so the protoApp Tauri
 backend can run speech-to-text inference on an iPad without a network
 connection.
+
+## Verdict: GO (pending CI confirmation)
+
+The build recipe and CI workflow (`.github/workflows/ios-whisper-spike.yml`)
+are ready. The workflow creates an isolated scratch crate depending on
+`whisper-rs = 0.16` with the `metal` feature, then runs
+`cargo build --target aarch64-apple-ios --release` on a `macos-15` runner.
+
+Once CI confirms a successful build, the decision is **GO** — use
+`whisper-rs` on iOS with `--features stt,metal`. If CI fails, consult
+the decision matrix below and fall back to `SFSpeechRecognizer`.
+
+### Why this should work
+
+1. **whisper-rs-sys 0.15 vendors whisper.cpp** — the build script clones
+   and builds whisper.cpp via cmake. No manual vendoring required.
+2. **Metal feature is first-class** — `whisper-rs` exposes a `metal`
+   feature flag (disabled by default). The sys crate's cmake config
+   respects it and sets `GGML_METAL=ON`.
+3. **No OpenMP dependency on iOS** — whisper.cpp falls back to its
+   built-in thread pool when OpenMP is unavailable. The iOS SDK doesn't
+   include libomp; this is expected and handled.
+4. **Same pattern as llama spike** — `llama-cpp-sys-2` cross-compiles
+   for iOS with Metal (confirmed in `docs/spikes/llama-ios.md`).
+   whisper-rs-sys uses the same cmake + bindgen approach.
+
+### Pending CI verification
+
+Trigger `.github/workflows/ios-whisper-spike.yml` from the Actions tab.
+The job will:
+1. Build a scratch crate for `aarch64-apple-ios` with Metal
+2. Inspect the resulting staticlib for Metal symbols
+3. Upload the build log for manual review
 
 ## Architecture
 
