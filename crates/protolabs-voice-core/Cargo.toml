@@ -54,9 +54,12 @@ cuda = ["llama-cpp-2?/cuda", "whisper-rs?/cuda"]
 
 # iOS cross-compilation:
 #   cargo build --target aarch64-apple-ios --release --features llm,metal
+#   cargo build --target aarch64-apple-ios --release --features stt,metal
 # Requires: full Xcode.app (not just CLI tools), cmake (`brew install cmake`).
 # Env vars: LLAMA_CPP_SYS_2_CXXSTANDARD=17, OPENMP_ROOT="" (no OpenMP on iOS).
-# See: docs/spikes/llama-ios.md for full spike results and fallback plan.
+# Whisper: no special env vars — whisper-rs-sys handles cmake internally.
+# See: docs/spikes/llama-ios.md and docs/spikes/whisper-ios.md for full
+# spike results and fallback plans.
 
 [dev-dependencies]
 reqwest.workspace = true

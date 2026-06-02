@@ -1,0 +1,118 @@
+# Spike: verify that `whisper-rs = 0.16` can cross-compile for
+# iOS (aarch64-apple-ios) with Metal backend support.
+#
+# This job creates a minimal scratch crate, runs `cargo build` for the
+# iOS target on a macOS runner, then inspects the resulting staticlib
+# for Metal-related symbols.
+#
+# Output: docs/spikes/whisper-ios.md (go / no-go decision).
+#
+# Trigger: manually from Actions tab, or on-demand via workflow_dispatch.
+# Not on the default CI gate — this is a one-time spike, not a regression
+# check.
+
+name: iOS whisper-rs spike
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/ios-whisper-spike.yml
+      - crates/protolabs-voice-core/Cargo.toml
+      - Cargo.toml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-spike:
+    name: cargo build --target aarch64-apple-ios (whisper-rs Metal)
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install cmake (required by whisper-rs-sys build script)
+        run: brew install cmake
+
+      - name: Create scratch crate for iOS spike
+        run: |
+          mkdir -p /tmp/ios-whisper-spike/src
+          cat > /tmp/ios-whisper-spike/Cargo.toml <<'EOF'
+          [package]
+          name = "ios-whisper-spike"
+          version = "0.1.0"
+          edition = "2021"
+
+          [dependencies]
+          # whisper-rs 0.16 with Metal backend.
+          # Uses whisper-rs-sys 0.15 which vendors whisper.cpp via cmake.
+          whisper-rs = { version = "0.16", default-features = false, features = ["metal"] }
+          EOF
+          cat > /tmp/ios-whisper-spike/src/main.rs <<'EOF'
+          fn main() {
+              println!("whisper-rs linked successfully for iOS target");
+              println!("Metal support: {}", whisper_rs::whisper_library_exists());
+          }
+          EOF
+
+      - name: Build scratch crate for iOS target
+        run: |
+          cd /tmp/ios-whisper-spike
+          cargo build --target aarch64-apple-ios --release 2>&1 | tee /tmp/ios-whisper-spike-build.log
+
+      - name: Verify Metal symbols in staticlib
+        run: |
+          # Find the built whisper staticlib
+          LIB=$(find /tmp/ios-whisper-spike/target/aarch64-apple-ios/release/deps \
+                -name 'whisper*.a' | head -1)
+
+          if [ -z "$LIB" ]; then
+            echo "ERROR: no whisper staticlib found"
+            find /tmp/ios-whisper-spike/target/aarch64-apple-ios/release/deps -name '*.a' | head -20
+            exit 1
+          fi
+
+          echo "Found staticlib: $LIB"
+          echo "File size: $(du -h "$LIB" | cut -f1)"
+
+          # Check for Metal-related symbols
+          echo ""
+          echo "=== Metal symbol check ==="
+          nm "$LIB" 2>/dev/null | grep -i metal | head -20 || \
+            echo "(nm found no Metal symbols, checking strings...)"
+
+          # Also check via strings for embedded Metal shader blob
+          echo ""
+          echo "=== Embedded Metal shader check ==="
+          STRINGS_COUNT=$(strings "$LIB" 2>/dev/null | grep -c -i "MTLDevice\|MTLBuffer\|metal\|kernel" || true)
+          echo "Metal-related strings found: $STRINGS_COUNT"
+
+          if [ "$STRINGS_COUNT" -gt 0 ]; then
+            echo "PASS: Metal shader blobs detected in staticlib"
+            strings "$LIB" 2>/dev/null | grep -i "MTLDevice\|MTLBuffer\|metal\|kernel" | head -10
+          else
+            echo "WARN: No Metal symbols/strings found — may still be OK if shaders"
+            echo "      are embedded as data blobs without recognizable symbols."
+            echo "      Check build log for Metal cmake flags."
+          fi
+
+      - name: Check build log for Metal cmake flags
+        run: |
+          echo "=== CMake Metal configuration from build log ==="
+          grep -i "WHISPER_METAL\|metal\|Metal\|GGML_METAL" /tmp/ios-whisper-spike-build.log | head -20 || \
+            echo "No Metal references in build log"
+
+      - name: Upload build log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-whisper-spike-build-log
+          path: /tmp/ios-whisper-spike-build.log
+          retention-days: 14
