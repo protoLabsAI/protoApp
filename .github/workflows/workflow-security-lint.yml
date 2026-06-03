@@ -14,4 +14,4 @@ permissions:
 
 jobs:
   security-lint:
-    uses: protoLabsAI/release-tools/.github/workflows/workflow-security-lint.yml@main
+    uses: protoLabsAI/release-tools/.github/workflows/workflow-security-lint.yml@276c3505f399583d4359e7cc9be8e63df62f7749 # main
