@@ -1,0 +1,96 @@
+# Spike: verify that `zeroclaw-runtime` (the agent runtime we vendor for
+# M5) can cross-compile for iOS (aarch64-apple-ios). On iPad the agent
+# must run IN-PROCESS — iOS can't spawn the ORBIS Python sidecar — so the
+# whole zeroclaw-runtime dep tree has to build for the iOS target.
+#
+# This job builds a minimal scratch staticlib that depends on
+# zeroclaw-runtime (default-features = false, pinned to a zeroclaw commit)
+# for aarch64-apple-ios. A clean build is the GO signal; a failure names
+# exactly which dependency needs feature-gating or a fork patch
+# ("modify as needed").
+#
+# Output: docs/spikes/zeroclaw-ios.md (go / no-go decision).
+#
+# Trigger: workflow_dispatch, or PRs that touch this file / the pinned rev.
+# Not on the default CI gate — this is a one-time spike, not a regression
+# check.
+
+name: iOS zeroclaw-runtime spike
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/ios-zeroclaw-spike.yml
+
+permissions:
+  contents: read
+
+jobs:
+  ios-spike:
+    name: cargo build --target aarch64-apple-ios (zeroclaw-runtime)
+    runs-on: macos-15 # workspace-config: allow-hosted-runner one-time iOS spike; owned macOS runner is iPad-pivot milestone M2
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Install cmake (some zeroclaw deps build C via cmake)
+        run: brew install cmake
+
+      - name: Create scratch crate for iOS spike
+        run: |
+          mkdir -p /tmp/ios-zeroclaw-spike/src
+          cat > /tmp/ios-zeroclaw-spike/Cargo.toml <<'EOF'
+          [package]
+          name = "ios-zeroclaw-spike"
+          version = "0.1.0"
+          edition = "2021"
+
+          # staticlib, not a bin: we only need to prove the runtime + its dep
+          # tree cross-compile; a bin would add an iOS executable-link step
+          # that fails for unrelated reasons.
+          [lib]
+          crate-type = ["staticlib"]
+
+          [dependencies]
+          # Pinned to the zeroclaw commit we vendor for M5. default-features
+          # = false to test the minimal embeddable surface (no prometheus,
+          # no schema-export). Confirmed to build on host (aarch64-apple-darwin).
+          zeroclaw-runtime = { git = "https://github.com/protoLabsAI/zeroclaw", rev = "ea2d849fcfd74ff32717d7514ba714b9cdec7597", package = "zeroclaw-runtime", default-features = false }
+          EOF
+          cat > /tmp/ios-zeroclaw-spike/src/lib.rs <<'EOF'
+          // Depending on zeroclaw-runtime forces its whole dep tree to be
+          // compiled for the iOS target. `use ... as _` keeps it linked
+          // without pinning to a specific public symbol. A clean build IS
+          // the GO signal for embedding the agent in-process on iPad.
+          use zeroclaw_runtime as _;
+          EOF
+
+      - name: Build scratch crate for iOS target
+        run: |
+          cd /tmp/ios-zeroclaw-spike
+          cargo build --target aarch64-apple-ios --release 2>&1 | tee /tmp/ios-zeroclaw-build.log
+
+      - name: Inspect iOS artifacts (informational)
+        if: always()
+        run: |
+          ROOT=/tmp/ios-zeroclaw-spike/target/aarch64-apple-ios/release
+          echo "=== staticlib + archives under the iOS target ==="
+          find "$ROOT" -maxdepth 1 -name '*.a' -print -exec sh -c 'echo "  size: $(du -h "$1" | cut -f1)"' _ {} \; 2>/dev/null | head -20
+          echo "(build exit 0 above = zeroclaw-runtime cross-compiles for iOS)"
+
+      - name: Upload build log artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-zeroclaw-spike-build-log
+          path: /tmp/ios-zeroclaw-build.log
+          retention-days: 14
