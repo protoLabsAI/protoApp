@@ -1,8 +1,20 @@
 # Spike: zeroclaw-runtime iOS cross-compilation (M5 feasibility)
 
 **Date:** 2026-06-03
-**Status:** PENDING — host build confirmed, iOS cross-compile under test in CI
+**Status:** GO — confirmed in CI
 **Spike job:** `.github/workflows/ios-zeroclaw-spike.yml`
+
+> **CI confirmation (2026-06-03):** on PR #15, `cargo build --target
+> aarch64-apple-ios --release` of a staticlib depending on
+> `zeroclaw-runtime` (`default-features = false`, zeroclaw `ea2d849f`)
+> built cleanly on `macos-15` — the **entire dep tree cross-compiled for
+> iOS with no fork patches needed.** Embedding the agent in-process on
+> iPad is feasible at the compile level.
+>
+> **Caveat:** this proves it *builds* for iOS, not that every dep behaves
+> at *runtime* on a sandboxed device (fork/exec, filesystem, networking
+> assumptions). Runtime validation happens once M2 gets a build on actual
+> hardware/simulator. Compile is the necessary first gate, and it passed.
 
 ## Goal
 
