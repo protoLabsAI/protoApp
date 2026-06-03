@@ -1,8 +1,15 @@
 # Spike: llama.cpp iOS cross-compilation with Metal
 
-**Date:** 2026-06-02
-**Status:** GO — conditional (see verdict below)
+**Date:** 2026-06-02 (CI-confirmed 2026-06-03)
+**Status:** GO — confirmed in CI
 **Spike job:** `.github/workflows/ios-llama-spike.yml`
+
+> **CI confirmation (2026-06-03):** on PR #13, `cargo build --target
+> aarch64-apple-ios --release` with `llama-cpp-sys-2 = "=0.1.143"`,
+> `features = ["metal"]`, compiled and linked cleanly on a `macos-15`
+> runner in **2m36s** ("Finished `release`"). This is the first time the
+> spike actually ran — the original branch's CI never executed — so GO is
+> no longer aspirational.
 
 ## Goal
 

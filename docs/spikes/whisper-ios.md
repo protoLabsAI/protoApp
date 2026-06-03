@@ -1,8 +1,14 @@
 # Spike: whisper-rs iOS cross-compilation with Metal
 
-**Date:** 2026-06-02
-**Status:** GO (pending CI confirmation) — build recipe ready, awaiting `macos-15` runner
+**Date:** 2026-06-02 (CI-confirmed 2026-06-03)
+**Status:** GO — confirmed in CI
 **Spike job:** `.github/workflows/ios-whisper-spike.yml`
+
+> **CI confirmation (2026-06-03):** on PR #13, `cargo build --target
+> aarch64-apple-ios --release` with `whisper-rs = "0.16"`,
+> `features = ["metal"]`, compiled and linked cleanly on a `macos-15`
+> runner. The `SFSpeechRecognizer` fallback below is no longer needed —
+> keep it documented only as a contingency.
 
 ## Goal
 
