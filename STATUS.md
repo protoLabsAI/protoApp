@@ -1,6 +1,6 @@
 # protoApp — status
 
-_Last updated: 2026-04-23. Kept in the root because `HANDOFF.md` points at
+_Last updated: 2026-06-03. Kept in the root because `HANDOFF.md` points at
 it and because status rots fast enough that it deserves to be reviewed
 on every push._
 
@@ -10,6 +10,13 @@ Working Tauri 2 desktop app with an in-process OpenAI-compatible HTTP
 server. Chat, transcription, and speech endpoints are all real behind
 their Cargo features. Default LLM is **Qwen3-4B-Instruct-2507** on
 `llama-cpp-2` because Gemma 4 is blocked upstream — see below.
+
+**Active direction: the iPad pivot.** The product is moving from a macOS
+desktop app to an on-device iPad/iOS app (milestones M1–M6). On iPad the
+ORBIS Python sidecar can't survive — iOS forbids spawning an external
+interpreter — so the agent becomes an in-process Rust runtime
+([zeroclaw](https://github.com/protoLabsAI/zeroclaw), vendored, M5). See
+the [iPad pivot](#ipad-pivot-m1m6) section below.
 
 ## What works today
 
@@ -69,12 +76,27 @@ the FGDN path to models that have correctly-named tensors). When that
 lands and ships in a `llama-cpp-sys-2` point release, bump the pin and
 flip `DEFAULT_MODEL_REPO` back to `unsloth/gemma-4-E4B-it-GGUF`.
 
-## Roadmap
+## iPad pivot (M1–M6)
 
-Open task numbers are from the in-repo task tracker (not GitHub issues):
+The product is being ported from a macOS desktop app to an on-device
+iPad/iOS app. Milestones (the empty `epic/m2…m6` branches are roadmap
+markers; recreate from `main` when work on each begins):
 
-- **#12** — wire ORBIS Python into `orbis-sidecar` once the ORBIS side exposes a WebSocket entry point.
-- **#21** — preload engines on user demand (UI warmup buttons / auto-on-launch Zustand toggles) so the first chat request doesn't block on a 2.5 GB download.
+| Milestone | Goal | State |
+|---|---|---|
+| **M1** — engine portability | Prove the inference engines cross-compile to `aarch64-apple-ios` with Metal | ✅ **Done, CI-confirmed 2026-06-03.** llama-cpp-sys-2 0.1.143 (2m22s) + whisper-rs 0.16 both build on `macos-15`. See `docs/spikes/{llama,whisper}-ios.md`; jobs in `.github/workflows/ios-*-spike.yml`. |
+| **M2** — iPad walking skeleton | `tauri ios init`, stub build on simulator/device; iOS-in-CI on an owned macOS runner | ⏳ Not started. Needs full Xcode.app (CLI tools alone won't cross-compile). |
+| **M3** — chat on iPad | Qwen3-4B running on-device | ⏳ Not started. Unblocked by M1. |
+| **M4** — voice on iPad | whisper + kokoro on-device | ⏳ Not started. Unblocked by M1. |
+| **M5** — Rust agent replaces ORBIS | Vendor [zeroclaw](https://github.com/protoLabsAI/zeroclaw) as an **in-process** runtime; retire `crates/orbis-sidecar` | ⏳ Not started. iOS can't spawn the Python sidecar, so this is required, not optional. Embed `zeroclaw-runtime` as a lib — *not* zeroclaw's own `apps/tauri` (it uses a separate-process model that won't survive on iOS). |
+| **M6** — polish & ship | Mobile UX, installable | ⏳ Not started. |
+
+### Carry-over desktop tasks
+
+In-repo task-tracker items (not GitHub issues), still relevant:
+
+- **#21** — preload engines on user demand so the first chat doesn't block on a 2.5 GB download (worse on a metered iPad — fold into M3).
+- ~~**#12** — wire ORBIS Python into `orbis-sidecar`~~ — **superseded by M5.** ORBIS-on-device is replaced by an in-process Rust agent; don't build new ORBIS-sidecar wiring.
 
 ## Cargo pin cheat sheet
 
