@@ -39,7 +39,7 @@ agent to the local server:
 schema_version = 3
 
 [providers.models.openai.local]
-model = "Qwen3-4B-Instruct-2507"
+model = "qwen3-4b-instruct-2507"   # must match voice-core's /v1/models catalog
 api_key = "local"
 uri = "http://127.0.0.1:<port>/v1"
 

@@ -18,3 +18,9 @@ zeroclaw-config = { path = "../../vendor/zeroclaw/crates/zeroclaw-config", defau
 anyhow = { workspace = true }
 dirs = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+# Stand up the real voice-core stub server in the wiring test so we exercise
+# the full path: zeroclaw provider → http://127.0.0.1/v1 → voice-core router.
+protolabs-voice-core = { path = "../protolabs-voice-core" }
+tokio = { workspace = true }
