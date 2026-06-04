@@ -1,5 +1,9 @@
 [workspace]
-members = ["src-tauri", "crates/protolabs-voice-core", "crates/orbis-sidecar"]
+members = ["src-tauri", "crates/protolabs-voice-core", "crates/orbis-sidecar", "crates/protoapp-agent"]
+# vendor/zeroclaw is its own cargo workspace (the agent runtime we embed via
+# crates/protoapp-agent). Exclude it so cargo never tries to fold its members
+# into ours — we depend on two of its crates by path, nothing more.
+exclude = ["vendor/zeroclaw"]
 resolver = "2"
 
 [workspace.package]

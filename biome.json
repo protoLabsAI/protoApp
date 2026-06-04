@@ -7,7 +7,14 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**", "!src/bindings.ts", "vite.config.ts", "tsconfig*.json", "biome.json"]
+    "includes": [
+      "src/**",
+      "!src/bindings.ts",
+      "vite.config.ts",
+      "tsconfig*.json",
+      "biome.json",
+      "!vendor"
+    ]
   },
   "formatter": {
     "enabled": true,

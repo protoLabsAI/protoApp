@@ -26,3 +26,28 @@ pub fn greet(name: String) -> GreetResponse {
 pub fn get_api_base_url(server: State<'_, ApiServer>) -> String {
     format!("http://{}", server.addr)
 }
+
+/// Default model the local voice-core server serves — used when the frontend
+/// doesn't override it. Mirrors `DEFAULT_MODEL_FILE` in voice-core's LLM engine.
+const DEFAULT_AGENT_MODEL: &str = "Qwen3-4B-Instruct-2507";
+
+/// Drive one in-process agent turn (zeroclaw) and return the reply.
+///
+/// `base_url` is voice-core's server root (the frontend already resolves it via
+/// [`get_api_base_url`]); we take it as an argument rather than `State` so the
+/// command can be `async` without holding the state borrow across `.await`.
+/// The agent's LLM provider is wired to `{base_url}/v1`, so inference runs on
+/// the same local model the Chat tab uses — no network, no Python sidecar.
+#[tauri::command]
+#[specta::specta]
+pub async fn agent_ask(
+    base_url: String,
+    model: Option<String>,
+    message: String,
+    session_id: Option<String>,
+) -> Result<String, String> {
+    let model = model.unwrap_or_else(|| DEFAULT_AGENT_MODEL.to_string());
+    protoapp_agent::ask(&base_url, &model, &message, session_id.as_deref())
+        .await
+        .map_err(|e| format!("{e:#}"))
+}

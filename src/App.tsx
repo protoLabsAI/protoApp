@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Agent } from "@/components/agent";
 import { Chat } from "@/components/chat";
 import { Speak } from "@/components/speak";
 import { Transcribe } from "@/components/transcribe";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
 
-type Tab = "chat" | "transcribe" | "speak";
+type Tab = "chat" | "agent" | "transcribe" | "speak";
 const TABS: { id: Tab; label: string }[] = [
   { id: "chat", label: "Chat" },
+  { id: "agent", label: "Agent" },
   { id: "transcribe", label: "Transcribe" },
   { id: "speak", label: "Speak" },
 ];
@@ -69,6 +71,7 @@ function App() {
           className="w-full max-w-2xl flex justify-center"
         >
           {tab === "chat" && <Chat />}
+          {tab === "agent" && <Agent />}
           {tab === "transcribe" && <Transcribe />}
           {tab === "speak" && <Speak />}
         </div>

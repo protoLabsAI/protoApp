@@ -43,6 +43,7 @@ pub fn run() {
     let specta_builder = Builder::<tauri::Wry>::new().commands(collect_commands![
         commands::greet,
         commands::get_api_base_url,
+        commands::agent_ask,
     ]);
 
     #[cfg(debug_assertions)]
