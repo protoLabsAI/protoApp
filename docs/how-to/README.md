@@ -8,4 +8,4 @@ the shortest path to solving a specific problem.
 - [Enable Metal or CUDA](./enable-metal-cuda.md)
 - [Use the OpenAI SDK from React](./use-openai-sdk-from-react.md)
 - [Record and play audio from React](./record-and-play-audio.md)
-- [Integrate ORBIS as a Python sidecar](./integrate-orbis-sidecar.md)
+- [Use the in-process agent](./use-the-in-process-agent.md)

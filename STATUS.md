@@ -28,8 +28,8 @@ the [iPad pivot](#ipad-pivot-m1m6) section below.
 | Real STT | ✅ behind `--features stt` | whisper-rs 0.16 against `ggml-base.en-q5_1.bin`. Requires `brew install cmake` once. |
 | Real TTS | ✅ behind `--features tts` | kokoros (git dep), Apache-2.0. Requires `cmake`. |
 | Metal / CUDA feature gates | ✅ | `--features llm,metal` on Apple Silicon. |
-| ORBIS sidecar plumbing | ✅ crate, ⏳ wiring | `orbis-sidecar` crate ready; waiting on ORBIS-side WebSocket entry point. See [docs/how-to/integrate-orbis-sidecar.md](./docs/how-to/integrate-orbis-sidecar.md). |
-| React voice panels | ✅ | Chat, Transcribe, Speak tabs; engine banner shows load / download / error states via a live `engine-status` Tauri event bus. |
+| In-process agent (zeroclaw) | ✅ | `protoapp-agent` embeds `zeroclaw-runtime`; verified end-to-end (real Qwen3-4B reply via the agent on Metal). Replaces the ORBIS sidecar — see [docs/how-to/use-the-in-process-agent.md](./docs/how-to/use-the-in-process-agent.md). |
+| React voice panels | ✅ | Chat, Agent, Transcribe, Speak tabs; engine banner shows load / download / error states via a live `engine-status` Tauri event bus. |
 
 ## Known blockers / upstream bugs
 
@@ -88,7 +88,7 @@ markers; recreate from `main` when work on each begins):
 | **M2** — iPad walking skeleton | `tauri ios init`, stub build on simulator/device; iOS-in-CI on an owned macOS runner | ⏳ Not started. Needs full Xcode.app (CLI tools alone won't cross-compile). |
 | **M3** — chat on iPad | Qwen3-4B running on-device | ⏳ Not started. Unblocked by M1. |
 | **M4** — voice on iPad | whisper + kokoro on-device | ⏳ Not started. Unblocked by M1. |
-| **M5** — Rust agent replaces ORBIS | Vendor [zeroclaw](https://github.com/protoLabsAI/zeroclaw) as an **in-process** runtime; retire `crates/orbis-sidecar` | ⏳ Not started. iOS can't spawn the Python sidecar, so this is required, not optional. Embed `zeroclaw-runtime` as a lib — *not* zeroclaw's own `apps/tauri` (it uses a separate-process model that won't survive on iOS). |
+| **M5** — Rust agent replaces ORBIS | Vendor [zeroclaw](https://github.com/protoLabsAI/zeroclaw) as an **in-process** runtime; retire `crates/orbis-sidecar` | ✅ **Done.** `vendor/zeroclaw` submodule + `crates/protoapp-agent` embed `zeroclaw-runtime` in-process (lib, not zeroclaw's `apps/tauri`). Provider → voice-core's local server; cross-compiles to iOS (`docs/spikes/zeroclaw-ios.md`); verified end-to-end with a real Qwen3-4B reply. `orbis-sidecar` removed. Runtime-on-device validation waits for M2. |
 | **M6** — polish & ship | Mobile UX, installable | ⏳ Not started. |
 
 ### Carry-over desktop tasks

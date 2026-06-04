@@ -24,7 +24,7 @@ agent sidecar.
 | Metal + CUDA feature flags | shipped |
 | Real whisper-rs STT | shipped behind `--features stt` (requires `brew install cmake` once) |
 | Real Kokoro TTS | shipped behind `--features tts` (via `kokoros` git dep) |
-| ORBIS Python sidecar plumbing | shipped as `orbis-sidecar`; awaits ORBIS WS entry point ([#12](./docs/how-to/integrate-orbis-sidecar.md)) |
+| In-process agent (zeroclaw, replaces the ORBIS sidecar) | shipped as `protoapp-agent` — see [the how-to](./docs/how-to/use-the-in-process-agent.md) |
 | React voice panels (mic / TTS playback) | shipped as Transcribe + Speak tabs; work against stubs today, pick up real engines automatically |
 | Gemma 4 as default | ⏳ blocked on upstream llama.cpp ([STATUS.md](./STATUS.md)) |
 
@@ -70,20 +70,21 @@ for the full walkthrough.
 │    │  /v1/audio/transcriptions ← whisper-rs │
 │    │  /v1/audio/speech ← kokoros            │
 │    │                                        │
-│    └── orbis-sidecar (spawn + WebSocket)    │
-└────────────────────┬────────────────────────┘
-                     │
-              ┌──────▼────────────────┐
-              │ ORBIS Python sidecar  │
-              │ (agent, a2a, memory)  │
-              └───────────────────────┘
+│  protoapp-agent (zeroclaw, in-process)      │
+│    └─ LLM provider → localhost:<port>/v1 ───┘
+└─────────────────────────────────────────────┘
 ```
+
+The agent runs **in-process** (no sidecar): iOS forbids spawning an
+external interpreter, so the old ORBIS Python sidecar is replaced by a
+vendored Rust runtime (zeroclaw) embedded via `protoapp-agent`, whose
+LLM provider points back at voice-core's own local server.
 
 Workspace members:
 
 - [`src-tauri/`](./src-tauri/) — Tauri shell (commands, lifecycle, window)
 - [`crates/protolabs-voice-core/`](./crates/protolabs-voice-core/) — OpenAI-compatible router + engine wrappers
-- [`crates/orbis-sidecar/`](./crates/orbis-sidecar/) — Python sidecar spawner + WebSocket client
+- [`crates/protoapp-agent/`](./crates/protoapp-agent/) — in-process zeroclaw agent bridge (replaces the ORBIS sidecar)
 
 Details in [docs/reference/workspace-crates.md](./docs/reference/workspace-crates.md)
 and [docs/explanation/architecture.md](./docs/explanation/architecture.md).

@@ -60,9 +60,11 @@ The code is commented where the *why* isn't obvious. Start at:
 - [docs/tutorials/run-local-llm.md](./docs/tutorials/run-local-llm.md) — enabling real inference.
 - [docs/explanation/engine-choices.md](./docs/explanation/engine-choices.md) — why these specific engines.
 
-Two open follow-ups in the in-repo task tracker:
+Open follow-up in the in-repo task tracker:
 
-- **#12** — wire ORBIS Python into `orbis-sidecar`.
 - **#21** — preload engines on user demand so the first chat doesn't block on a 2.5 GB download.
 
-Both are green-field, not blocking what's here.
+(**#12** — wire ORBIS Python into `orbis-sidecar` — is closed: the sidecar
+was removed and replaced by the in-process zeroclaw agent. See
+[STATUS.md](./STATUS.md#ipad-pivot-m1m6) and
+[docs/how-to/use-the-in-process-agent.md](./docs/how-to/use-the-in-process-agent.md).)

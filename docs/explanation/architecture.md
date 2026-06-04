@@ -10,9 +10,12 @@ in-process (feature-gated behind `--features llm`), serving
 Qwen3-4B-Instruct-2507 as the default model. STT (whisper-rs) and TTS
 (kokoros) are wired up behind their own feature flags. See
 [`docs/explanation/engine-choices.md`](./engine-choices.md) for the
-rationale on each. A second workspace crate, `orbis-sidecar`, provides
-the plumbing for a Python agent process to hang off this system for
-higher-order reasoning without ever touching the audio hot path.
+rationale on each. A second workspace crate, `protoapp-agent`, embeds a
+vendored Rust agent runtime ([zeroclaw](https://github.com/protoLabsAI/zeroclaw))
+**in-process** for higher-order reasoning — its LLM provider points back
+at this same local server. (It replaced an earlier `orbis-sidecar` that
+ran the agent as a separate Python process; iOS forbids spawning one, so
+the agent had to move in-process.)
 
 ## Why Tauri + in-process Rust inference
 
@@ -50,7 +53,7 @@ See [reference/workspace-crates.md](../reference/workspace-crates.md)
 for the concrete layout. The important property is:
 
 - **`protolabs-voice-core`** is reusable. A future `orbis-tauri` app, a headless CLI, or a Cloud Run deployment can all embed it.
-- **`orbis-sidecar`** is pure IPC — no engine code. We can use it without voice, or use voice without it.
+- **`protoapp-agent`** isolates the in-process zeroclaw embedding behind a tiny `ask()` surface, so voice-core and the shell stay agent-agnostic.
 - **`protoapp`** is the thinnest possible Tauri shell proving both.
 
 ## Feature flags as a complexity throttle
@@ -76,4 +79,4 @@ matrix composable (details in
 ## Further reading
 
 - [Engine choices](./engine-choices.md) — *why* llama-cpp-2 + whisper-rs + Kokoro, specifically.
-- [Voice hot path vs agent brain](./voice-hotpath-vs-agent-brain.md) — *why* ORBIS stays Python instead of getting rewritten in Rust.
+- [Voice hot path vs agent brain](./voice-hotpath-vs-agent-brain.md) — the voice-vs-reasoning split (note: its "keep the agent in Python" conclusion was reversed by the iPad pivot — the agent is now in-process Rust).
