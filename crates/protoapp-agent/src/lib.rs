@@ -10,7 +10,7 @@
 //! ```ignore
 //! let reply = protoapp_agent::ask(
 //!     "http://127.0.0.1:53217",     // voice-core base URL
-//!     "Qwen3-4B-Instruct-2507",     // model the local server serves
+//!     "qwen3-4b-instruct-2507",     // model id from voice-core's catalog
 //!     "What's on my calendar?",
 //!     Some("session-1"),
 //! ).await?;

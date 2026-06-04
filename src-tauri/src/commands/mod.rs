@@ -28,8 +28,10 @@ pub fn get_api_base_url(server: State<'_, ApiServer>) -> String {
 }
 
 /// Default model the local voice-core server serves — used when the frontend
-/// doesn't override it. Mirrors `DEFAULT_MODEL_FILE` in voice-core's LLM engine.
-const DEFAULT_AGENT_MODEL: &str = "Qwen3-4B-Instruct-2507";
+/// doesn't override it. MUST match an id in voice-core's catalog
+/// (`api::models::default_models`), or `/v1/chat/completions` returns 404
+/// `model_not_found`. The catalog id is lowercase.
+const DEFAULT_AGENT_MODEL: &str = "qwen3-4b-instruct-2507";
 
 /// Drive one in-process agent turn (zeroclaw) and return the reply.
 ///
