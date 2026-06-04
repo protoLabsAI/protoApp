@@ -1,5 +1,18 @@
 # The Rust voice hot path vs the Python agent brain
 
+> **⚠️ Superseded by the iPad pivot (2026-06).** This page argues for
+> keeping the agent brain in **Python** (as the ORBIS sidecar) and *not*
+> rewriting it in Rust. The iPad pivot reversed that decision: iOS forbids
+> spawning an external interpreter, so a Python sidecar can't ship on
+> device. The agent is now an **in-process Rust runtime** ([zeroclaw](https://github.com/protoLabsAI/zeroclaw),
+> vendored under `vendor/zeroclaw`, embedded via `crates/protoapp-agent`).
+> The hot-path-vs-brain *distinction* below still holds; the
+> "keep it Python / don't rewrite in Rust" *conclusion* no longer does.
+> See [STATUS.md](../../STATUS.md#ipad-pivot-m1m6) and
+> [the agent how-to](../how-to/use-the-in-process-agent.md). Kept for the
+> historical reasoning — and as a record of why the iOS constraint forced
+> the rewrite the section "Why not rewrite ORBIS in Rust" argued against.
+
 This is the most important architectural decision in the repo, because
 it's the one we could have gotten wrong and broken everything. Here's
 what we chose and why.

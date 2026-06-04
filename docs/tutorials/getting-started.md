@@ -85,8 +85,12 @@ cargo test --workspace
 ```
 
 You should see every test passing across `protolabs-voice-core` and
-`orbis-sidecar` (counts will drift as the suite grows; what matters is
+`protoapp-agent` (counts will drift as the suite grows; what matters is
 "all green").
+
+> Note: `cargo test --workspace` compiles the vendored zeroclaw runtime
+> (the agent). Run `git submodule update --init` first, or the
+> `protoapp-agent` build will fail on the missing `vendor/zeroclaw`.
 
 ## Next
 

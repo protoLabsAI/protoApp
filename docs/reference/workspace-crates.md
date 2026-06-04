@@ -1,7 +1,7 @@
 # Workspace crates
 
-protoApp is a Cargo workspace with three members, plus the React
-frontend living alongside.
+protoApp is a Cargo workspace with three members, plus a vendored agent
+runtime and the React frontend living alongside.
 
 ## Layout
 
@@ -12,7 +12,9 @@ protoApp/
 ├── src-tauri/                       # workspace member — Tauri wrapper
 ├── crates/
 │   ├── protolabs-voice-core/        # workspace member — engine substrate
-│   └── orbis-sidecar/               # workspace member — Python sidecar plumbing
+│   └── protoapp-agent/              # workspace member — in-process zeroclaw bridge
+├── vendor/
+│   └── zeroclaw/                    # git submodule — the agent runtime (own workspace)
 ├── src/                             # React 19 + Vite 7 + shadcn frontend
 └── docs/                            # this directory
 ```
@@ -47,32 +49,35 @@ Internal:
 - `api::{chat, models, speech, state, transcriptions}` — endpoint modules
 - `engines::llm` — llama-cpp-2 wrapper loading Qwen3-4B-Instruct-2507, feature-gated behind `llm`
 
-## `orbis-sidecar` — `crates/orbis-sidecar/`
+## `protoapp-agent` — `crates/protoapp-agent/`
 
-Spawn + WebSocket client for running the ORBIS Python agent as a
-Tauri sidecar.
+The in-process agent bridge. Embeds `zeroclaw-runtime` (from the
+`vendor/zeroclaw` submodule) and drives one agent turn per call. Replaces
+the old `orbis-sidecar` — iOS can't spawn an external interpreter, so the
+agent runs inside the host process rather than as a Python sidecar.
 
 Public surface:
 
 ```rust
-pub use client::Client;
-pub use protocol::{IncomingMessage, OutgoingMessage};
-pub use spawn::{Sidecar, SpawnConfig, SpawnError};
+pub async fn ask(base_url: &str, model: &str, message: &str, session_id: Option<&str>)
+    -> anyhow::Result<String>;
 ```
 
-- `Sidecar::spawn(SpawnConfig)` — launches, waits for readiness line, manages lifecycle
-- `Sidecar::connect()` — opens a new WebSocket to the running sidecar
-- `Sidecar::shutdown(grace)` — graceful(-ish) shutdown, escalating to SIGKILL
-- `Client` — sends `OutgoingMessage`, receives `IncomingMessage`
+- Renders a zeroclaw `config.toml` wiring a `default` agent to voice-core's
+  local OpenAI-compatible server (`{base_url}/v1`), then calls
+  `zeroclaw_runtime::agent::process_message`.
+- Depends on `zeroclaw-runtime` + `zeroclaw-config` by path
+  (`default-features = false`); `vendor/zeroclaw` is its own cargo
+  workspace, excluded from protoApp's.
 
-See [orbis-sidecar protocol](./orbis-sidecar-protocol.md) for the wire
-format.
+See [the how-to](../how-to/use-the-in-process-agent.md) for usage and the
+generated config.
 
-## Why three crates?
+## Why these crates?
 
 - `protolabs-voice-core` is the reusable substrate — protoApp, a future orbis-tauri, a headless CLI can all embed it.
-- `orbis-sidecar` has zero engine logic; it's pure IPC plumbing. Keeping it separate avoids cross-contamination if we ever want voice without ORBIS or ORBIS without voice.
-- `protoApp` is the thinnest possible Tauri wrapper that demonstrates both crates in one place.
+- `protoapp-agent` keeps the zeroclaw embedding (and its large dep tree) isolated behind a tiny `ask()` surface, so the Tauri shell and voice-core stay agent-agnostic.
+- `protoApp` is the thinnest possible Tauri wrapper that wires them together.
 
-If this grows to a fourth crate, it'll be for a shared audio-IO layer
+If this grows another crate, it'll likely be a shared audio-IO layer
 (cpal + VAD + echo cancellation) that belongs outside voice-core.
