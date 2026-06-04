@@ -1,0 +1,20 @@
+[package]
+name = "protoapp-agent"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "In-process zeroclaw agent bridge for protoApp (replaces the ORBIS sidecar)."
+
+# zeroclaw is vendored as a git submodule under vendor/zeroclaw and depended on
+# by path so the fork can be modified in place ("modify as needed"). It is its
+# own cargo workspace, so its crates are NOT members of protoApp's workspace —
+# we just take path dependencies on the two we embed. default-features = false
+# keeps the surface minimal (no prometheus exporter / schema-export); both
+# crates are confirmed to cross-compile to aarch64-apple-ios (see
+# docs/spikes/zeroclaw-ios.md).
+[dependencies]
+zeroclaw-runtime = { path = "../../vendor/zeroclaw/crates/zeroclaw-runtime", default-features = false }
+zeroclaw-config = { path = "../../vendor/zeroclaw/crates/zeroclaw-config", default-features = false }
+anyhow = { workspace = true }
+dirs = { workspace = true }
+tracing = { workspace = true }

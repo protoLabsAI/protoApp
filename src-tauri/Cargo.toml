@@ -33,6 +33,10 @@ tracing-subscriber.workspace = true
 # The engine substrate — OpenAI-compatible router + inference engines
 protolabs-voice-core = { path = "../crates/protolabs-voice-core" }
 
+# In-process agent (zeroclaw, vendored) — the iPad-safe replacement for the
+# ORBIS Python sidecar. Drives agent turns against voice-core's local server.
+protoapp-agent = { path = "../crates/protoapp-agent" }
+
 [features]
 # Ship with all three real engines wired on by default. First compile is
 # ~15 min cold (mistralrs dominates); subsequent rebuilds are fast. On macOS

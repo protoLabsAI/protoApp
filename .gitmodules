@@ -1,0 +1,3 @@
+[submodule "vendor/zeroclaw"]
+	path = vendor/zeroclaw
+	url = https://github.com/protoLabsAI/zeroclaw
