@@ -122,6 +122,7 @@ pnpm lint                                         # Biome
 
 ## Further reading
 
+- [VISION.md](./VISION.md) — the north star and roadmap: a voice-first companion orb for iPad that delegates to the protoAgent fleet.
 - [STATUS.md](./STATUS.md) — what's shipped, what's blocked, and why.
 - [HANDOFF.md](./HANDOFF.md) — the three non-obvious things a new contributor needs to know.
 

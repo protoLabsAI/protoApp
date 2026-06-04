@@ -18,6 +18,11 @@ interpreter — so the agent becomes an in-process Rust runtime
 ([zeroclaw](https://github.com/protoLabsAI/zeroclaw), vendored, M5). See
 the [iPad pivot](#ipad-pivot-m1m6) section below.
 
+**Where it's headed:** a voice-first companion orb that delegates to the
+protoAgent fleet over A2A — the full north star and phased roadmap are in
+[VISION.md](./VISION.md). This STATUS file tracks current build state; the
+roadmap there is the plan.
+
 ## What works today
 
 | Area | Status | Notes |
